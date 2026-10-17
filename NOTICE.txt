@@ -1,0 +1,6 @@
+Aster System Care — development preview
+Copyright Nikita Shulga. All rights reserved unless separately licensed.
+Aster is a working product name, not a trademark-clearance assertion.
+No affiliation with CCleaner, Reg Organizer, Microsoft or Apple.
+Electron and packaging dependencies retain their own licenses.
+No malware-detection, security-certification or speed-improvement guarantee is made.

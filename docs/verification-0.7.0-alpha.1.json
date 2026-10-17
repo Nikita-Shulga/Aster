@@ -1,0 +1,55 @@
+{
+  "version": "0.7.0-alpha.1",
+  "checkedAt": "2026-10-17T12:57:18.405Z",
+  "sourceTests": {
+    "pass": 187,
+    "fail": 0,
+    "skip": 1
+  },
+  "interfaceChecks": {
+    "pass": 224,
+    "fail": 0,
+    "pages": 30,
+    "kind": "DOM and event behavior; no native rendering"
+  },
+  "packagedService": {
+    "pass": 59,
+    "fail": 0,
+    "skip": 1,
+    "kind": "Extracted package code with synthetic registry, installer and shell adapters"
+  },
+  "javascriptSyntaxFiles": 63,
+  "packagedSourceFilesMatched": 46,
+  "zipFilesVerified": 74,
+  "executableIconSizes": [
+    16,
+    24,
+    32,
+    48,
+    64,
+    128,
+    256
+  ],
+  "cleanupEnabled": false,
+  "fileRestoreEnabled": false,
+  "sandboxEnabled": true,
+  "realRegistryWrites": 0,
+  "realInstallerRuns": 0,
+  "realUninstallerRuns": 0,
+  "nativeWindowTested": false,
+  "nativeVisualLayoutTested": false,
+  "permissionsChanged": false,
+  "personalFilesUsed": false,
+  "skips": [
+    "POSIX-only source check",
+    "Native driver inventory previously denied by the restricted executor"
+  ],
+  "nativeLimitations": [
+    "Native startup and rendered layout",
+    "Native IPC, dialogs and OS icon extraction",
+    "Actual startup changes, registry writes and undo",
+    "Live WinGet provider and publisher installer execution",
+    "Windows uninstaller handoff",
+    "Installer lifecycle, signing, clean-PC distribution and macOS"
+  ]
+}

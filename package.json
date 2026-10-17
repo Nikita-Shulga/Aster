@@ -1,0 +1,63 @@
+{
+  "name": "aster-system-care",
+  "version": "0.7.0-alpha.1",
+  "description": "Local-first, evidence-led system care for Windows and macOS",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Nikita Shulga",
+  "main": "src/desktop/main.cjs",
+  "engines": {
+    "node": ">=22.17.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node scripts/run-tests.cjs",
+    "check": "node scripts/check-source.cjs",
+    "preview": "node scripts/preview.cjs",
+    "package:win": "electron-builder --win nsis zip --x64 --publish never",
+    "package:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never",
+    "test:renderer": "node scripts/qa-renderer.cjs",
+    "preview:bundle": "node scripts/build-preview.cjs",
+    "test:native": "node scripts/native-smoke.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.8.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.nikitashulga.aster",
+    "productName": "Aster",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "NOTICE.txt",
+      "assets/icon.png"
+    ],
+    "artifactName": "Aster-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "requestedExecutionLevel": "asInvoker",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "entitlements": "scripts/entitlements.mac.plist",
+      "entitlementsInherit": "scripts/entitlements.mac.plist",
+      "icon": "assets/icon.icns"
+    }
+  }
+}

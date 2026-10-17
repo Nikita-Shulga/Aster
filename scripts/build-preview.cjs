@@ -1,0 +1,9 @@
+'use strict';
+const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
+const root=path.resolve(__dirname,'../src/renderer');
+let js=['icons.js','demo.js','workbench.js','studio.js','atelier.js','hub.js','dashboard.js','management.js','app.js'].map(name=>fs.readFileSync(path.join(root,name),'utf8').replace(/^import .*?;\s*$/gm,'').replace(/\bexport\s+(?=(?:const|let|function|class)\b)/g,'')).join('\n');
+if(js.includes('</script'))throw new Error('Unexpected script delimiter');
+const hash=crypto.createHash('sha256').update(js).digest('base64');
+const css=['styles.css','studio.css','atelier.css','hub.css','dashboard.css'].map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n').replace(/url\('\.\/fonts\/([^']+)'\)/g,(_m,name)=>"url('data:font/woff;base64,"+fs.readFileSync(path.join(root,'fonts',name)).toString('base64')+"')");
+const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'"><title>Aster — interactive design preview</title><style>${css}</style></head><body><a class="skip-link" href="#main">Skip to content</a><div id="app"></div><div id="notifications" class="notifications" role="status" aria-live="polite"></div><dialog id="modal" aria-labelledby="modal-title"></dialog><script type="module">${js}</script></body></html>`;
+fs.mkdirSync(path.resolve(__dirname,'../deliverables'),{recursive:true});fs.writeFileSync(path.resolve(__dirname,'../deliverables/Aster-interactive-preview.html'),html);console.log('Built self-contained, offline, explicitly labelled demo HTML');
