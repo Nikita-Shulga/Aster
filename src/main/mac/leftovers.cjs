@@ -31,7 +31,22 @@ const CATEGORIES = [
 ];
 
 // Folders and files that belong to macOS itself or are shared, never "leftovers".
-const PROTECTED = /(^|\.)com\.apple\.|^(apple|\.globalpreferences|loginwindow|pbs|knowledge|cloudkit|addressbook|callhistory|crashreporter|dock|icloud|mobilesync|filesystem|fileprovider|syncservices|ubiquity|cloud|keychains?|accounts|spotlight|siri|quicklook|familycircle|com\.microsoft\.office|microsoft|google|mozilla|homebrew|com\.docker|node|npm|zsh|vscode|code$)/i;
+const PROTECTED = /(^|\.)com\.apple\.|^(apple|\.globalpreferences|loginwindow|pbs|knowledge|cloudkit|addressbook|callhistory|crashreporter|dock|icloud|mobilesync|filesystem|fileprovider|syncservices|ubiquity|cloud|keychains?|accounts|spotlight|siri|quicklook|familycircle|org\.cups\.|com\.microsoft\.office|microsoft|google|mozilla|homebrew|com\.docker|node|npm|zsh|vscode|code$)/i;
+
+// macOS daemons (contactsd, tipsd, Animoji…) keep folders in ~/Library named after themselves, not
+// com.apple.*. Collect the names of components macOS ships so those folders are never offered.
+const SYSTEM_EXTRA = ['animoji', 'memoji', 'sesstorage', 'assistant', 'baseband', 'privacypreservingmeasurement', 'sync', 'coresimulator', 'callhistorytransactions', 'callhistorydb'];
+let systemNames = null;
+function macosComponentNames() {
+  if (systemNames) return systemNames;
+  const names = new Set(SYSTEM_EXTRA);
+  const ls = d => { try { return fs.readdirSync(d); } catch { return []; } };
+  const add = n => names.add(n.toLowerCase().replace(/\.(app|framework|xpc|bundle|plist|appex)$/, ''));
+  for (const d of ['/usr/libexec', '/usr/sbin', '/usr/bin', '/System/Library/CoreServices', '/System/Library/PrivateFrameworks', '/System/Library/Frameworks', '/System/Applications', '/System/Library/Services']) for (const n of ls(d)) add(n);
+  for (const d of ['/System/Library/LaunchAgents', '/System/Library/LaunchDaemons']) for (const n of ls(d)) { const l = n.replace(/\.plist$/, ''); add(l); add(l.split('.').pop()); }
+  for (const root of ['/System/Library/PrivateFrameworks', '/System/Library/Frameworks']) for (const f of ls(root)) for (const sub of ['Support', 'XPCServices', 'Versions/A/Support', 'Versions/A/XPCServices']) for (const n of ls(path.join(root, f, sub))) if (!n.includes('.') || /\.(app|xpc)$/.test(n)) add(n);
+  return (systemNames = names);
+}
 
 class MacLeftovers {
   constructor({store, trash}) { this.store = store; this.trash = trash; this.issues = new Map(); }
@@ -40,26 +55,36 @@ class MacLeftovers {
   async installed() {
     const apps = await findApps(['/Applications', '/Applications/Utilities', path.join(require('node:os').homedir(), 'Applications'), ...SYSTEM_ROOTS, '/System/Library/CoreServices'], 3);
     const infos = await mapLimit(apps, 8, p => plist(path.join(p, 'Contents', 'Info.plist')));
-    const ids = new Set(), names = new Set(), vendors = new Set();
+    const ids = new Set(), names = new Set(), vendors = new Set(), brands = new Set(), words = new Set();
     apps.forEach((p, i) => {
       const id = (infos[i]?.CFBundleIdentifier || '').toLowerCase();
-      if (id) { ids.add(id); const parts = id.split('.'); if (parts.length > 2) vendors.add(parts.slice(0, 2).join('.')); }
+      if (id) { ids.add(id); const parts = id.split('.'); if (parts.length > 2) { vendors.add(parts.slice(0, 2).join('.')); if (parts[1].length > 3) { names.add(parts[1]); brands.add(parts[1]); } } }
       names.add(path.basename(p, '.app').toLowerCase());
+      for (const w of path.basename(p, '.app').toLowerCase().split(/[^a-z0-9]+/)) if (w.length > 3) words.add(w);
       if (infos[i]?.CFBundleName) names.add(String(infos[i].CFBundleName).toLowerCase());
     });
-    return {ids, names, vendors};
+    return {ids, names, vendors, brands, words};
   }
 
   async scan({categories}) {
     const want = new Set(Array.isArray(categories) && categories.length ? categories : CATEGORIES.map(c => c.id));
     const inst = await this.installed();
+    const system = macosComponentNames();
     // An identifier counts as installed if an app has it, or an app from the same vendor exists (helpers, agents).
     const known = raw => {
       const n = raw.toLowerCase().replace(/\.(plist|savedstate)$/, '');
-      if (PROTECTED.test(n)) return true;
+      if (PROTECTED.test(n) || system.has(n)) return true;
       if (inst.ids.has(n) || inst.names.has(n)) return true;
+      // "ZoomUpdater" or "ZoomPhone" next to an installed us.zoom.xos belong to that vendor.
+      if (!n.includes('.') && [...inst.brands].some(b => n.startsWith(b))) return true;
+      // "cura" or "Ultimaker B.V." next to "UltiMaker Cura.app", "Epic" next to "Epic Games Launcher.app".
+      if (!/^[a-z]+\.[a-z0-9-]+\./.test(n) && n.split(/[^a-z0-9]+/).some(w => inst.words.has(w))) return true;
       if ([...inst.ids].some(id => n.startsWith(id + '.') || id.startsWith(n + '.'))) return true;
       const parts = n.split('.');
+      // org.amneziavpn.AmneziaVPN belongs to an installed AmneziaVPN.app even if its bundle id differs.
+      if (parts.length > 2 && parts[parts.length - 1].length > 3 && inst.names.has(parts[parts.length - 1])) return true;
+      // com.dropbox.DropboxUpdater belongs to Dropbox.app (com.getdropbox.dropbox).
+      if (parts.length > 2 && parts[1].length > 3 && (inst.names.has(parts[1]) || inst.words.has(parts[1]))) return true;
       if (parts.length > 2 && inst.vendors.has(parts.slice(0, 2).join('.'))) return true;
       return parts.length < 3 && !/\s/.test(n) && n.length < 3;
     };
