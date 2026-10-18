@@ -13,7 +13,8 @@ const {Registry} = require('../src/main/registry.cjs');
 
 const KEY = 'HKCU\\Software\\AsterSelfTest';
 const reg = (...a) => execFileSync('reg.exe', a, {encoding: 'utf8', windowsHide: true});
-const query = (k = KEY) => { try { return reg('query', k, '/s'); } catch { return null; } };
+// Canonical dump: value order inside a key is irrelevant, so lines are sorted per key.
+const query = (k = KEY) => { try { return reg('query', k, '/s').split(/\r?\n\r?\n/).map(b => b.split(/\r?\n/).map(s => s.trim()).filter(Boolean).sort().join('\n')).filter(Boolean).sort().join('\n\n'); } catch { return null; } };
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aster-reg-'));
 const store = new Store(dir);
 const registry = new Registry({store});

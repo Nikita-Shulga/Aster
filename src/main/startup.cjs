@@ -87,9 +87,10 @@ Out-Json @($items.ToArray())
 
 const SET_APPROVED = S.LIB + String.raw`
 # $in: { key, name, enabled }
-$k = Open-RegKey ($in.key.Substring(0, $in.key.LastIndexOf('\'))) $true
-if ($null -eq $k) { throw 'Access denied. Administrator rights are required for entries that apply to all users.' }
-try { $sub = $k.CreateSubKey($in.key.Substring($in.key.LastIndexOf('\') + 1)) } finally { $k.Close() }
+$s = Split-RegPath $in.key
+$base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($s.hive, [Microsoft.Win32.RegistryView]::Registry64)
+try { $sub = $base.CreateSubKey($s.sub, $true) } catch { $sub = $null } finally { $base.Close() }
+if ($null -eq $sub) { throw 'Access denied. Administrator rights are required for entries that apply to all users.' }
 try {
   if ($in.enabled) { $bytes = [byte[]](2,0,0,0,0,0,0,0,0,0,0,0) }
   else { $bytes = [byte[]](@(3,0,0,0) + [BitConverter]::GetBytes([DateTime]::Now.ToFileTime())) }

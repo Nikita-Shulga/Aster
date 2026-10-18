@@ -48,8 +48,8 @@ function classify(p, isDir, programs) {
   if (l.includes('/library/caches/')) return R('safe', 'Cache', `Cached data${owner ? ` of ${owner}` : ''}.`, 'Safe to delete — the Cleaner does this automatically.', owner || title(l.split('/library/caches/')[1].split('/')[0]));
   if (l.includes('/library/logs/')) return R('safe', 'Logs', 'Log files.', 'Safe to delete.', owner);
   if (l.startsWith(HOME + '/.trash')) return R('review', 'Trash', 'Files you deleted.', 'Empty the Trash when you’re sure.', 'Finder');
+  if (/\.(dmg|pkg|mpkg)$/.test(l)) return R('safe', 'Installer', 'A disk image or installer package used to install an app.', 'Safe to delete once the app is installed.', owner || (l.startsWith(HOME + '/downloads') ? 'Your downloads' : null));
   if (l.startsWith(HOME + '/downloads')) return {...(ext || R('review', 'Download', 'Something you downloaded.', 'Safe to delete if you no longer need it.')), owner: 'Your downloads'};
-  if (/\.(dmg|pkg|mpkg)$/.test(l)) return R('safe', 'Installer', 'A disk image or installer package.', 'Safe to delete once the app is installed.', owner);
   if (new RegExp(`^${HOME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(movies|pictures|music|documents|desktop)(/|$)`).test(l)) return {...(ext || R('review', 'Personal files', 'Your own files.', 'Only delete what you’re sure you don’t need.')), owner: 'You'};
   if (owner) return R('review', ext?.kind || (isDir ? 'App data' : 'App file'), `Data or settings of ${owner}.`, `Deleting can reset or break ${owner}. Uninstall it from Programs if you don’t use it.`, owner);
   if (l.startsWith(LIB + '/application support/') || l.startsWith(LIB + '/containers/')) {

@@ -31,7 +31,7 @@ const CATEGORIES = [
 ];
 
 // Folders and files that belong to macOS itself or are shared, never "leftovers".
-const PROTECTED = /^(com\.apple\.|apple|\.globalpreferences|loginwindow|pbs|knowledge|cloudkit|addressbook|callhistory|crashreporter|dock|icloud|mobilesync|filesystem|fileprovider|syncservices|ubiquity|cloud|keychains?|accounts|spotlight|siri|quicklook|familycircle|com\.microsoft\.office|microsoft|google|mozilla|homebrew|com\.docker|node|npm|zsh|vscode|code$)/i;
+const PROTECTED = /(^|\.)com\.apple\.|^(apple|\.globalpreferences|loginwindow|pbs|knowledge|cloudkit|addressbook|callhistory|crashreporter|dock|icloud|mobilesync|filesystem|fileprovider|syncservices|ubiquity|cloud|keychains?|accounts|spotlight|siri|quicklook|familycircle|com\.microsoft\.office|microsoft|google|mozilla|homebrew|com\.docker|node|npm|zsh|vscode|code$)/i;
 
 class MacLeftovers {
   constructor({store, trash}) { this.store = store; this.trash = trash; this.issues = new Map(); }
