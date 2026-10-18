@@ -1,24 +1,20 @@
 {
-  "name": "aster-system-care",
-  "version": "0.7.0-alpha.1",
-  "description": "Local-first, evidence-led system care for Windows and macOS",
-  "private": true,
-  "license": "UNLICENSED",
+  "name": "aster",
+  "productName": "Aster",
+  "version": "2.0.0",
+  "description": "Aster — a fast, honest cleaner, optimizer and uninstaller for Windows and macOS.",
   "author": "Nikita Shulga",
-  "main": "src/desktop/main.cjs",
-  "engines": {
-    "node": ">=22.17.0"
-  },
+  "license": "MIT",
+  "homepage": "https://github.com/Nikita-Shulga/Aster",
+  "main": "src/main/main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node scripts/run-tests.cjs",
-    "check": "node scripts/check-source.cjs",
-    "preview": "node scripts/preview.cjs",
-    "package:win": "electron-builder --win nsis zip --x64 --publish never",
-    "package:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never",
-    "test:renderer": "node scripts/qa-renderer.cjs",
-    "preview:bundle": "node scripts/build-preview.cjs",
-    "test:native": "node scripts/native-smoke.cjs"
+    "preview": "node scripts/preview-server.cjs",
+    "test": "node --test test/*.test.cjs",
+    "icons": "electron scripts/build-icons.cjs",
+    "screenshots": "electron scripts/screenshots.cjs",
+    "dist": "electron-builder --win nsis portable --x64 --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never"
   },
   "devDependencies": {
     "electron": "44.8.0",
@@ -27,37 +23,43 @@
   "build": {
     "appId": "com.nikitashulga.aster",
     "productName": "Aster",
+    "copyright": "Copyright © 2026 Nikita Shulga",
     "asar": true,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "src/**/*",
-      "package.json",
-      "NOTICE.txt",
-      "assets/icon.png"
-    ],
-    "artifactName": "Aster-${version}-${os}-${arch}.${ext}",
+    "directories": {"output": "dist", "buildResources": "assets"},
+    "files": ["src/**/*", "assets/icon.png", "package.json", "LICENSE"],
+    "artifactName": "Aster-${version}-${arch}.${ext}",
     "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "requestedExecutionLevel": "asInvoker",
-      "icon": "assets/icon.ico"
+      "target": ["nsis", "portable"],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
+      "artifactName": "Aster-Setup-${version}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Aster",
       "deleteAppDataOnUninstall": false
     },
+    "portable": {"artifactName": "Aster-${version}-portable.exe"},
     "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "assets/icon.png",
       "category": "public.app-category.utilities",
-      "hardenedRuntime": true,
-      "entitlements": "scripts/entitlements.mac.plist",
-      "entitlementsInherit": "scripts/entitlements.mac.plist",
-      "icon": "assets/icon.icns"
-    }
+      "artifactName": "Aster-${version}-mac-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true,
+      "minimumSystemVersion": "12.0",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Aster uses System Events to list and manage your login items and to switch light/dark mode.",
+        "NSDesktopFolderUsageDescription": "Aster analyzes folders you choose to show what takes up space.",
+        "NSDocumentsFolderUsageDescription": "Aster analyzes folders you choose to show what takes up space.",
+        "NSDownloadsFolderUsageDescription": "Aster can clean old installers from your Downloads folder."
+      }
+    },
+    "dmg": {"title": "Aster ${version}", "artifactName": "Aster-${version}-mac-${arch}.${ext}"}
   }
 }

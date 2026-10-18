@@ -1,0 +1,89 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - name: Tests
+        run: npm test
+      - name: Build installer and portable app
+        run: npx electron-builder --win nsis portable --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aster-windows
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - name: Tests
+        run: npm test
+      - name: Self-test (real app, real macOS data, read-only)
+        env:
+          ASTER_SELFTEST: ${{ runner.temp }}/selftest
+        run: |
+          npx electron . 2>&1 | tee "$RUNNER_TEMP/selftest.log" || true
+          ls -la "$RUNNER_TEMP/selftest" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aster-macos-selftest
+          path: |
+            ${{ runner.temp }}/selftest/*.png
+            ${{ runner.temp }}/selftest.log
+      - name: Build DMG and ZIP (Apple Silicon and Intel)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --mac dmg zip --arm64 --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aster-macos
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: aster-*
+          merge-multiple: false
+      - name: Checksums
+        run: |
+          mkdir -p upload
+          cp artifacts/aster-windows/*.exe upload/
+          cp artifacts/aster-macos/* upload/
+          cd upload && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: upload/*

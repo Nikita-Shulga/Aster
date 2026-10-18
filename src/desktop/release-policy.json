@@ -1,5 +1,0 @@
-{
-  "channel": "alpha",
-  "nativeMutationsValidated": false,
-  "reason": "Native cleanup validation has not yet been completed, so Aster cleanup and file restoration remain disabled. Startup and registry management and software updates use separate explicit previews and native confirmation; native end-to-end validation of these operations is still pending."
-}

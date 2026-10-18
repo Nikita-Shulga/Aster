@@ -1,0 +1,69 @@
+# Changelog
+
+## 2.0.0 — 2026-10-19
+
+### macOS
+Aster now runs natively on macOS (Apple Silicon and Intel, macOS 12+), with every feature rebuilt for how a Mac works:
+- **Cleaner**: app caches, logs, crash reports, temporary files, Quick Look thumbnails, Trash, iPhone/iPad update files, old installers in Downloads, Mail attachments, Safari, Chrome, Edge, Brave, Arc, Vivaldi, Opera, Yandex, Firefox, Xcode build files and device support, Homebrew, npm, pip, Yarn, CocoaPods, Gradle, Adobe media cache, Discord, Spotify, Slack, Teams, VS Code, Steam.
+- **Leftovers** (replaces the registry on Mac): settings, caches, saved state, logs, app data and sandbox containers of apps that are no longer installed, plus launch agents pointing to deleted programs — all moved to the Trash.
+- **Programs**: every app with version, size, volume, App Store / Apple / downloaded type and when it was last opened. Uninstall quits the app, moves it to the Trash and removes its data from ~/Library.
+- **Startup**: login items, launch agents and background daemons, switched on/off with launchctl like System Settings does.
+- **Updates**: macOS updates, Homebrew formulae and casks, and Mac App Store apps (with `mas`).
+- **Optimize & Mac settings**: window animations, Dock, Spotlight, Low Power Mode, .DS_Store on network/USB drives, personalized ads, analytics, Finder, Dock, keyboard & trackpad, screenshots and appearance; screen and sleep timers; display info.
+- **Tools**: Time Machine snapshots, free purgeable snapshot space, Spotlight rebuild, Launch Services reset, DNS flush.
+- **Disk analyzer & duplicates** understand macOS volumes and folders and explain files like sleepimage, Docker.raw, iPhone backups, iCloud Drive and Photos libraries.
+- **Full Disk Access** guidance replaces “Restart as administrator”; admin-only actions use the macOS password prompt.
+
+### Also
+- GitHub Actions builds and tests on real Windows and macOS machines and attaches both platforms' installers to releases.
+
+## 1.2.0 — 2026-10-18
+
+### Filters everywhere
+- **Programs**: new Drive column and a clickable per-drive breakdown; filter by type, drive, publisher, size and install date. Every filter option shows how many items it matches.
+- **Startup**: Drive column; filter by status (enabled, disabled, file missing, unknown publisher), drive, who it applies to, and publisher.
+- **Cleaner**: filter results by drive, recommendation and category, and sort them. "Clean shown" cleans only what is visible — with a drive filter, only that drive is cleaned (including that drive's Recycle Bin).
+- **Registry**: search issues; filter by recommendation, HKCU/HKLM, the drive of the missing file, and whether admin rights are needed; select or unselect everything shown.
+- **Disk analyzer**: search the current folder; filter by folders/files, file type, size, modified date and the "Delete?" verdict. The treemap and largest-files list follow the filters; click a file type to filter by it.
+- **Duplicates**: search across all drives at once; filter by drive, file type and whether copies are on the same or different drives; sort by space wasted, file size or number of copies; auto-select "keep the copy on drive X".
+- **Updates**: search and filter by size of the change (major upgrade, feature update, bug-fix).
+- **Optimize**: search; show only recommended-but-not-applied, already applied or changed items; filter by recommendation, admin rights and when it takes effect.
+- **History**: search and filter by time period.
+
+## 1.1.0 — 2026-10-18
+
+### Smarter explanations
+- **Cleaner**: every item says what is stored there, what you lose if you delete it and a clear verdict (Safe / Read first / Keep). Results show where the data lives, grouped by drive and folder, instead of raw file names. The confirmation lists exactly which choices you will notice.
+- **Disk analyzer**: every large file and folder is identified — what it is, which program it belongs to, and whether deleting it is safe (e.g. pagefile.sys, hiberfil.sys, game data, virtual disks, app data of uninstalled programs).
+- **Registry cleaner**: each category explains what it is and what fixing changes; only safe categories are pre-selected, and an honest note explains what registry cleaning does and doesn't do.
+
+### New
+- **Optimize**: 16 reversible performance, gaming and privacy tweaks (startup delay, menu speed, animations, hibernation, Storage Sense, Game Mode, background recording, GPU scheduling, mouse acceleration, ads and tips, web search in Start, telemetry), power plans with explanations, "Apply all recommended", and a list of apps using the most memory.
+- **Windows settings**: monitor refresh rate and resolution (with a 15-second auto-revert), screen/sleep timeouts, light/dark mode, file extensions, hidden files, classic right-click menu, taskbar alignment, search box, End task, clipboard history.
+- Smart Scan now also checks optimizations.
+- Every setting change shows before → after, the trade-off and whether a restart is needed.
+
+## 1.0.0 — 2026-10-18
+
+A ground-up rebuild of Aster. Replaces the 0.x alpha series.
+
+### New
+- **Smart Scan** on the Overview: junk, registry, startup and updates in one pass, with "Fix everything".
+- **Cleaner** that actually cleans: 40+ rules for Windows, seven browsers and popular apps, running-app detection, auto-close option and folder exclusions.
+- **Registry cleaner** with 13 issue categories and automatic `.reg` backups.
+- **Full registry editor**: all hives and value types, create/rename/delete, search, import/export.
+- **Uninstaller** that runs the real uninstaller, then removes leftover folders (to the Recycle Bin) and registry keys (backed up). Store apps, batch uninstall, broken-entry cleanup.
+- **Startup manager** covering Run keys, startup folders, scheduled tasks and services, using Windows' own enable/disable flags.
+- **One-click app updates** through WinGet.
+- **Disk analyzer** with treemap, drill-down, file types and largest files.
+- **Duplicate finder** using content hashing.
+- **Tools**: restore points, DNS flush, Recycle Bin, Windows utility launcher.
+- **History** with one-click restore of every registry backup.
+- **Restart as administrator** for system-wide areas.
+
+### Design
+- New design system: one stylesheet, light/dark/system themes, Inter typography, consistent spacing, cards, tables, modals and toasts.
+- Native-feeling window with Windows title-bar controls, new app icon.
+
+### Removed
+- The 0.x "review-only" pages (organization plans, version catalogs, maintenance reminders and similar) that didn't change anything.
