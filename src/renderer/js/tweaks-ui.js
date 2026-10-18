@@ -3,7 +3,7 @@ import {html, ic, api, app, bytes, modal, toast, isMac} from './lib.js';
 export const VERDICT = {
   recommended: {label: 'Recommended', tone: 'green'},
   optional: {label: 'Optional', tone: ''},
-  situational: {label: 'Depends on your PC', tone: 'amber'},
+  situational: {label: isMac ? 'Depends on your Mac' : 'Depends on your PC', tone: 'amber'},
   preference: {label: 'Personal preference', tone: 'blue'}
 };
 const RESTART = {explorer: isMac ? 'Restarts Finder' : 'Restarts File Explorer', signout: isMac ? 'After logging out' : 'After sign-out', reboot: 'After restart', apps: 'In apps you open next'};

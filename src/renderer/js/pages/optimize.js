@@ -7,7 +7,7 @@ import {chip, search as searchBox, filterHandlers} from '../filters.js';
 const DEFAULT_FILTERS = {search: '', show: 'all', verdict: 'all', access: 'all', restart: 'all'};
 const of = structuredClone(DEFAULT_FILTERS);
 const SHOW = [{value: 'todo', label: 'Recommended, not applied', test: t => t.recommended !== null && t.value !== t.recommended}, {value: 'applied', label: 'Already applied', test: t => t.recommended !== null && t.value === t.recommended}, {value: 'changed', label: 'Changed from Windows default', test: t => t.type === 'toggle' && t.value === true}];
-const VERDICT_OPTS = [{value: 'recommended', label: 'Recommended'}, {value: 'optional', label: 'Optional'}, {value: 'situational', label: 'Depends on your PC'}, {value: 'preference', label: 'Personal preference'}];
+const VERDICT_OPTS = [{value: 'recommended', label: 'Recommended'}, {value: 'optional', label: 'Optional'}, {value: 'situational', label: isMac ? 'Depends on your Mac' : 'Depends on your PC'}, {value: 'preference', label: 'Personal preference'}];
 function matchTweak(t, skip) {
   const q = of.search.trim().toLowerCase();
   return (skip === 'show' || of.show === 'all' || SHOW.find(x => x.value === of.show).test(t)) &&
@@ -46,7 +46,7 @@ function summary() {
   return html`<div class="card hero" style="grid-template-columns:auto 1fr auto">
     ${ring(pct(done, rec.length), {size: 96, stroke: 8, label: `${done}/${rec.length}`, sub: 'applied', tone: todo.length ? 'accent' : 'green'})}
     <div><h2>${todo.length ? `${plural(todo.length, 'recommended optimization')} not applied yet` : 'All recommended optimizations are applied'}</h2>
-      <p>Recommended changes are safe for everyone and reversible. Items marked “Depends on your PC” are only worth it in specific cases — read the trade-off first.</p></div>
+      <p>Recommended changes are safe for everyone and reversible. Items marked “Depends on your ${isMac ? 'Mac' : 'PC'}” are only worth it in specific cases — read the trade-off first.</p></div>
     <div class="hero-actions">${todo.length ? html`<button class="btn btn-primary btn-lg" data-action="applyAll">${ic('zap', 18)} Apply ${todo.length} recommended</button>` : ''}</div>
   </div>`;
 }
