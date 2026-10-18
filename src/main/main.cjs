@@ -59,10 +59,33 @@ async function blankIcon() {
   } catch { genericIcon = null; }
   return genericIcon;
 }
+// macOS: read the bundle's own .icns and convert it with sips (avoids app.getFileIcon on bundles).
+async function macIcon(file) {
+  const sh = require('./mac/sh.cjs');
+  const bundle = (/^(.*?\.app)(\/|$)/.exec(file) || [])[1];
+  if (!bundle) return null;
+  const info = await sh.plist(path.join(bundle, 'Contents', 'Info.plist')).catch(() => ({}));
+  let name = info.CFBundleIconFile || 'AppIcon';
+  if (!/\.icns$/i.test(name)) name += '.icns';
+  const icns = path.join(bundle, 'Contents', 'Resources', name);
+  if (!fs.existsSync(icns)) return null;
+  const out = path.join(app.getPath('temp'), `aster-icon-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
+  try {
+    await sh.sh('/usr/bin/sips', ['-s', 'format', 'png', '-Z', '64', icns, '--out', out], {timeout: 10000});
+    const img = nativeImage.createFromPath(out);
+    return img.isEmpty() ? null : img.toDataURL();
+  } finally { fs.rmSync(out, {force: true}); }
+}
+
 async function getIcon(file) {
   const key = file.toLowerCase();
   if (iconCache.has(key)) return iconCache.get(key);
   let url = null;
+  if (isMac) {
+    try { url = await macIcon(file); } catch {}
+    iconCache.set(key, url);
+    return url;
+  }
   try {
     if (/\.(png|jpg|jpeg|ico)$/i.test(file)) {
       const img = nativeImage.createFromPath(file);
@@ -223,6 +246,7 @@ async function main() {
     if (!win || event.sender !== win.webContents || !event.senderFrame?.url?.startsWith('file:')) throw new Error('Unauthorized');
     const fn = api[method];
     if (!fn) throw new Error(`Unknown method ${method}`);
+    if (process.env.ASTER_SELFTEST) console.log('[api]', method);
     try { return await fn(args || {}); }
     catch (e) { throw new Error(e?.message || 'The operation failed.'); }
   });

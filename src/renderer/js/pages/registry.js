@@ -54,7 +54,7 @@ function issuesView() {
     ${lockedCount ? html`<div class="callout blue" style="margin-top:12px">${ic('shield', 18)}<div class="grow">${plural(lockedCount, 'issue')} in machine-wide keys need administrator rights.</div><button class="btn btn-sm btn-secondary" data-action="relaunch">Restart as admin</button></div>` : ''}
     <div class="callout" style="margin-top:12px">${ic('info', 18)}<div class="grow"><strong style="color:var(--text)">Honest note:</strong> ${isMac ? 'removing leftovers frees disk space and tidies your Library, but it won’t make your Mac faster. Aster pre-selects only safe categories; “Optional” ones (app data, containers) can hold documents or game saves — review them first. Removed items go to the Trash.' : raw(`fixing the registry tidies up leftovers from removed programs — ghost entries in Installed apps, startup errors, broken "Open with" items. It will not make your PC noticeably faster. Aster pre-selects only categories that are safe to fix; "Optional" ones are left for you to decide. Every fix is backed up and can be restored from History.`)}</div></div>
     <div class="toolbar filterbar" style="margin:12px 0 0">
-      ${searchBox(rf.search, 'Search names, keys or missing files', 250)}
+      ${searchBox(rf.search, isMac ? 'Search leftovers' : 'Search names, keys or missing files', isMac ? 200 : 250)}
       ${chip('verdict', 'Recommendation', [{value: 'safe', label: 'Safe to fix'}, {value: 'review', label: 'Optional'}].map(o => ({...o, count: all.filter(i => matchIssue(i, 'verdict') && (catOf(i)?.verdict === 'safe' ? 'safe' : 'review') === o.value).length})), rf.verdict)}
       ${isMac ? '' : chip('hive', 'Location', [{value: 'HKCU', label: 'Your account (HKCU)'}, {value: 'HKLM', label: 'Whole PC (HKLM)'}].map(o => ({...o, count: all.filter(i => matchIssue(i, 'hive') && hiveOf(i) === o.value).length})), rf.hive)}
       ${isMac ? '' : chip('drive', 'Missing file on', countOptions(all.filter(i => matchIssue(i, 'drive')), i => driveOf(i.target), {sort: 'alpha', unknown: 'No file path'}), rf.drive, {allLabel: 'Any drive'})}
@@ -245,7 +245,7 @@ export default definePage({
     this.listener = () => this.update();
     shared.listeners.add(this.listener);
     loadRegistryCategories().then(() => this.update());
-    if (!ed.children.has('')) loadChildren('').then(() => openKey(ed.path, this)).catch(() => {});
+    if (!isMac && !ed.children.has('')) loadChildren('').then(() => openKey(ed.path, this)).catch(() => {});
   },
   onUnmount() { shared.listeners.delete(this.listener); },
   on: {
