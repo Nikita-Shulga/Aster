@@ -23,7 +23,7 @@ module.exports = async function selftest(win, outDir) {
 
   const pages = [
     ['cleaner', '.rule-app', 'document.querySelector(".empty [data-action=analyze]")?.click(), true', '.cleaner-summary'],
-    ['cleaner', '.result-item', 'document.querySelector("[data-action=toggleResult]")?.click(), true', '.detail-panel'],
+    ['cleaner', '.result-item', 'document.querySelector("[data-action=toggleResult]")?.click(), setTimeout(() => document.querySelector("[data-action=toggleFiles]")?.click(), 300), true', '[data-action=trashFile]'],
     ['registry', '.issue-group, .empty', 'document.querySelector(".empty [data-action=scan]")?.click(), true', '.issue-group'],
     ['optimize', '.tweak'],
     ['wsettings', '.tweak'],

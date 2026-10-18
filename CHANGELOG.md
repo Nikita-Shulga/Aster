@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 — 2026-10-19
+
+### Cleaner: clean exactly what you want
+- **Delete a single file**: every file in “Show largest files” has its own Trash button (it goes to the Trash/Recycle Bin, so it can be put back). Up to the 40 largest files per item are listed.
+- **Clean a single location**: each location of an item has its own clean button, e.g. clean only Steam’s cache and keep the rest.
+- **App caches on Mac are split per app** (R, Steam, Epic, Zoom…), so one app’s cache can be cleaned on its own.
+- Long file paths no longer push the results off the edge of the window.
 
 ### macOS fixes (tested on a MacBook Air M4, macOS 15.5)
 - **Memory usage** on Overview now matches Activity Monitor (app memory + wired + compressed). It used to show ~99% because macOS reports almost no "free" memory while it caches files.

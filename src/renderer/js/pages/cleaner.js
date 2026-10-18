@@ -8,6 +8,9 @@ const c = shared.cleaner;
 const open = new Set(['windows']);
 const openResults = new Set();
 const showFiles = new Set();
+const allFiles = new Set();
+const allLocs = new Set();
+const busyFiles = new Set();
 const DEFAULT_FILTERS = {drive: 'all', verdict: 'all', group: 'all', sort: 'size'};
 const cf = structuredClone(DEFAULT_FILTERS);
 const bytesOn = r => cf.drive === 'all' ? r.bytes : (r.locations || []).filter(l => l.drive === cf.drive).reduce((n, l) => n + l.bytes, 0);
@@ -118,6 +121,7 @@ function results() {
     <div class="card" style="margin-top:12px">
       ${rows.length ? html`<div class="list">${rows.map(r => {
         const rule = byId.get(r.id);
+        const locs = (r.locations || []).filter(l => cf.drive === 'all' || l.drive === cf.drive);
         return html`<div class="result-item ${openResults.has(r.id) ? 'open' : ''}">
           <div class="list-row clickable result-row" data-action="toggleResult" data-id="${r.id}">
             ${appTile(rule.appId, rule.app)}
@@ -129,17 +133,25 @@ function results() {
           <div class="detail-panel">
             ${explain(rule)}
             <div style="margin-top:14px;font-size:12.5px;font-weight:600;color:var(--text-2)">Where it is stored</div>
-            <table class="loc-table selectable">${(r.locations || []).filter(l => cf.drive === 'all' || l.drive === cf.drive).map(l => html`<tr>
-              <td style="width:52px"><span class="drive-b">${l.drive}</span></td>
+            <table class="loc-table selectable">${(allLocs.has(r.id) ? locs : locs.slice(0, 10)).map(l => html`<tr>
+              <td style="width:1%"><span class="drive-b">${l.drive}</span></td>
               <td><div style="font-weight:500">${l.label}</div><div class="p">${l.path}</div></td>
               <td class="num faint" style="white-space:nowrap;text-align:right">${plural(l.files, 'file')}</td>
               <td class="num" style="white-space:nowrap;text-align:right;font-weight:600">${bytes(l.bytes)}</td>
-              <td style="width:32px"><button class="icon-btn sm" data-action="openLoc" data-path="${l.path}" title="Open in Explorer">${ic('external', 14)}</button></td>
+              <td style="width:32px"><button class="icon-btn sm" data-action="openLoc" data-path="${l.path}" title="${isMac ? 'Show in Finder' : 'Open in Explorer'}">${ic('external', 14)}</button></td>
+              ${(r.locations || []).length > 1 ? html`<td style="width:32px"><button class="icon-btn sm" data-action="cleanLoc" data-id="${r.id}" data-path="${l.path}" title="Clean only this location" aria-label="Clean only ${l.label}" ${canClean(r) ? '' : 'disabled'}>${ic('broom', 14)}</button></td>` : ''}
             </tr>`)}</table>
+            ${locs.length > 10 && !allLocs.has(r.id) ? html`<div style="margin-top:6px"><button class="linkish" data-action="moreLocs" data-id="${r.id}">Show all ${locs.length} locations</button></div>` : ''}
             <div style="margin-top:10px"><button class="linkish" data-action="toggleFiles" data-id="${r.id}">${showFiles.has(r.id) ? 'Hide' : 'Show'} largest files</button></div>
             ${showFiles.has(r.id) ? html`<div class="files-peek selectable" style="display:block;padding:6px 0 0">
-              ${r.sample.slice(0, 12).map(f => html`<div class="f"><span class="truncate mono">${f.path}</span><span class="num">${bytes(f.size)}</span></div>`)}
-              ${r.files > 12 ? html`<div class="f"><span>…and ${num(r.files - 12)} more</span></div>` : ''}
+              ${(() => {
+                const list = allFiles.has(r.id) ? r.sample : r.sample.slice(0, 12);
+                return html`${list.map(f => html`<div class="f" style="align-items:center"><span class="truncate mono" title="${f.path}">${f.path}</span><span class="num">${bytes(f.size)}</span>
+                  <button class="icon-btn sm" data-action="revealFile" data-path="${f.path}" title="${isMac ? 'Show in Finder' : 'Show in Explorer'}" aria-label="Show file">${ic('external', 13)}</button>
+                  <button class="icon-btn sm" data-action="trashFile" data-id="${r.id}" data-path="${f.path}" title="Move this file to the ${isMac ? 'Trash' : 'Recycle Bin'}" aria-label="Delete this file" ${busyFiles.has(f.path) ? 'disabled' : ''}>${busyFiles.has(f.path) ? html`<span class="spinner"></span>` : ic('trash', 13)}</button></div>`)}
+                  ${r.sample.length > 12 && !allFiles.has(r.id) ? html`<div class="f"><button class="linkish" data-action="moreFiles" data-id="${r.id}">Show ${r.sample.length - 12} more of the largest</button></div>` : ''}
+                  ${r.files > list.length ? html`<div class="f"><span>…and ${num(r.files - list.length)} smaller files. Use the broom next to a location to clean just that folder.</span></div>` : ''}`;
+              })()}
             </div>` : ''}
           </div>
         </div>`;
@@ -204,6 +216,47 @@ export default definePage({
     },
     toggleFiles(el) { const id = el.dataset.id; showFiles.has(id) ? showFiles.delete(id) : showFiles.add(id); this.update(); },
     openLoc(el) { api('shell.reveal', {path: el.dataset.path}); },
+    revealFile(el) { api('shell.reveal', {path: el.dataset.path}); },
+    moreLocs(el) { allLocs.add(el.dataset.id); this.update(); },
+    moreFiles(el) { allFiles.add(el.dataset.id); this.update(); },
+    // Removes one file the user picked; it goes to the Trash / Recycle Bin, so it can be put back.
+    async trashFile(el) {
+      const {id, path} = el.dataset;
+      busyFiles.add(path); this.update();
+      try {
+        const res = await api('cleaner.removeFiles', {id, paths: [path]});
+        const r = c.analysis?.results.find(x => x.id === id);
+        if (res.done.length && r) {
+          const f = r.sample.find(x => x.path === path);
+          const size = f?.size || 0;
+          r.sample = r.sample.filter(x => x.path !== path);
+          r.bytes = Math.max(0, r.bytes - size); r.files = Math.max(0, r.files - 1);
+          const loc = (r.locations || []).filter(l => path.startsWith(l.path)).sort((a, b) => b.path.length - a.path.length)[0];
+          if (loc) { loc.bytes = Math.max(0, loc.bytes - size); loc.files = Math.max(0, loc.files - 1); }
+          c.analysis.totalBytes = Math.max(0, c.analysis.totalBytes - size);
+          toast(`Moved to the ${isMac ? 'Trash' : 'Recycle Bin'} · ${bytes(size)}`, {type: 'success'});
+          notify();
+        } else toast(res.failed[0]?.error || 'The file could not be removed.', {type: 'error'});
+      } finally { busyFiles.delete(path); this.update(); }
+    },
+    async cleanLoc(el) {
+      const {id, path} = el.dataset;
+      const r = c.analysis?.results.find(x => x.id === id);
+      const rule = c.rules.find(x => x.id === id);
+      const loc = r?.locations.find(l => l.path === path);
+      if (!loc) return;
+      const {ok} = await modal({title: `Clean ${bytes(loc.bytes)} from ${loc.label}?`, icon: 'broom', confirm: 'Clean now', body: html`<p>${plural(loc.files, 'file')} in <span class="mono">${loc.path}</span> will be deleted permanently. Other locations of ${rule.app} · ${rule.name} are kept.</p><p class="muted" style="margin-top:8px">${rule.ifDeleted}</p>`});
+      if (!ok) return;
+      c.phase = 'cleaning'; c.progress = {index: 0, total: 1, label: loc.label}; notify();
+      try {
+        const res = await api('cleaner.clean', {ids: [id], paths: [path], closeApps: !!app.settings?.closeAppsBeforeCleaning});
+        loc.bytes = 0; loc.files = 0;
+        r.locations = r.locations.filter(l => l !== loc);
+        r.bytes = Math.max(0, r.bytes - res.freed); r.files = Math.max(0, r.files - res.deleted);
+        r.sample = r.sample.filter(f => !f.path.startsWith(path));
+        toast(`Freed ${bytes(res.freed)}${res.skipped ? ` · ${num(res.skipped)} in-use files skipped` : ''}`, {type: 'success'});
+      } finally { c.phase = 'analyzed'; notify(); }
+    },
     toggleResult(el) { const id = el.dataset.id; openResults.has(id) ? openResults.delete(id) : openResults.add(id); this.update(); },
     async analyze() { await analyzeCleaner(); },
     async cancel() { await api('cleaner.cancel'); },
