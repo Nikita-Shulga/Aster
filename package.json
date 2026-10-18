@@ -12,7 +12,7 @@
     "preview": "node scripts/preview-server.cjs",
     "test": "node --test test/*.test.cjs",
     "icons": "electron scripts/build-icons.cjs",
-    "screenshots": "electron scripts/screenshots.cjs",
+    "readme-assets": "electron scripts/readme-assets.cjs && electron scripts/readme-assets.cjs --hero-only",
     "dist": "electron-builder --win nsis portable --x64 --publish never",
     "dist:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never"
   },

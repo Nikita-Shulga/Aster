@@ -82,6 +82,11 @@ jobs:
           mkdir -p upload
           cp artifacts/aster-windows/*.exe upload/
           cp artifacts/aster-macos/* upload/
+          # Fixed names so README buttons can link to releases/latest/download/<name>.
+          cp upload/Aster-Setup-*.exe upload/Aster-Windows-Setup.exe
+          cp upload/Aster-*-portable.exe upload/Aster-Windows-Portable.exe
+          cp upload/Aster-*-mac-arm64.dmg upload/Aster-Mac-AppleSilicon.dmg
+          cp upload/Aster-*-mac-x64.dmg upload/Aster-Mac-Intel.dmg
           cd upload && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:

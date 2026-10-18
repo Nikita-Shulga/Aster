@@ -1,128 +1,202 @@
 <p align="center">
-  <img src="assets/icon.png" width="96" height="96" alt="Aster logo">
-</p>
-
-<h1 align="center">Aster</h1>
-
-<p align="center">
-  <strong>A fast, honest cleaner, optimizer and uninstaller for Windows and macOS.</strong><br>
-  Junk cleaning · Registry / leftovers cleaner · Complete uninstaller · Startup manager · Optimizer · App updates · Disk analyzer · Duplicate finder
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner-dark.svg">
+    <img src="docs/images/banner-light.svg" alt="Aster — A cleaner, faster, tidier computer." width="100%">
+  </picture>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/overview.png" alt="Aster overview with Smart Scan results" width="880">
+  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest"><img alt="Release 2.0.0" src="https://img.shields.io/badge/release-v2.0.0-5B4CF0?style=flat-square"></a>
+  <a href="https://github.com/Nikita-Shulga/Aster/actions/workflows/build.yml"><img alt="Build" src="https://github.com/Nikita-Shulga/Aster/actions/workflows/build.yml/badge.svg"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-555?style=flat-square">
+  <img alt="Electron 44" src="https://img.shields.io/badge/electron-44-555?style=flat-square">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-555?style=flat-square"></a>
 </p>
 
-## Why Aster
+<p align="center">
+  <b><a href="https://github.com/Nikita-Shulga/Aster/releases/latest">Download</a></b> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="docs/MAC.md">macOS notes</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-Aster combines what you'd normally need CCleaner, Reg Organizer, Revo Uninstaller and WinDirStat for (or CleanMyMac, AppCleaner and DaisyDisk on a Mac) — in one clean, modern app with no ads, no telemetry, no upsells and no fake "health" scores. It is built natively for each platform: the Windows version works with the registry, services and WinGet; the Mac version works with your Library folder, launch agents, Homebrew and Time Machine.
+---
 
-- **Everything is explained.** Every cleaner item, registry category, large file and setting says in plain language what it is, what you lose and whether it's safe — before anything changes.
-- **Everything is undoable where it matters.** Every registry change is exported to a `.reg` backup first and can be restored from History in one click. Your own files go to the Recycle Bin.
-- **Nothing phones home.** Aster works entirely offline. The only network access is WinGet when you check for updates.
+**Aster cleans, speeds up and declutters your Windows PC or Mac** — junk files, leftovers of removed apps, startup clutter, outdated software and forgotten gigabytes. It does what you'd normally need CCleaner, Reg Organizer, Revo Uninstaller and WinDirStat for (or CleanMyMac, AppCleaner and DaisyDisk on a Mac), in one calm app.
+
+**Nothing changes until you've seen exactly what will happen.** Every item explains what it is, what you'd lose and whether it's safe to delete. No ads, no account, no telemetry, no scary “health scores”.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+    <img src="docs/images/hero-light.png" alt="Aster's Overview after a Smart Scan: junk files, registry issues, optimizations, startup apps and updates, with system information and live usage (sample data)" width="860">
+  </picture>
+</p>
 
 ## Features
 
-| | |
-|---|---|
-| **Smart Scan** | One click checks junk files, registry problems, startup apps and outdated software. "Fix everything" cleans junk and repairs the registry (with backup). |
-| **Cleaner** | 40+ cleaning rules: Windows temp, Recycle Bin, thumbnail/shader/update caches, error reports, crash dumps, logs; Chrome, Edge, Brave, Opera, Vivaldi, Yandex and Firefox caches, history, cookies and sessions; Discord, Spotify, Teams, Slack, VS Code, Steam, npm, pip and more. Only installed apps are shown. Detects running apps and can close them for you. |
-| **Registry cleaner** | 13 categories: broken uninstall entries, invalid startup entries, missing app paths and shared DLLs, obsolete "Open with" apps, unused file extensions, broken COM registrations, MUI cache, compatibility records, installer folders, fonts, help files and empty software keys. |
-| **Registry editor** | Browse all hives, create/edit/rename/delete values of every type (`REG_SZ`, `EXPAND_SZ`, `MULTI_SZ`, `DWORD`, `QWORD`, `BINARY`), create and delete keys, search keys/values/data, import and export `.reg`. Protected Windows roots can't be deleted. |
-| **Programs** | All desktop and Microsoft Store apps with real icons, sizes and dates. Runs the official uninstaller, then sweeps up leftover folders and registry keys. Batch uninstall, broken-entry cleanup and leftover scans for already-removed apps. |
-| **Startup** | Registry Run keys, startup folders, scheduled tasks and third-party services. Enable/disable uses the same mechanism as Task Manager, so it's fully reversible. Flags entries pointing to missing files. Add your own programs. |
-| **Optimize** | 16 reversible tweaks for speed, gaming and privacy, each with what you gain and what you give up; power plans explained; apps using the most memory. |
-| **Windows settings** | Monitor refresh rate and resolution (auto-reverts if you don't confirm), screen and sleep timeouts, dark mode, Explorer and taskbar options. |
-| **Updates** | Finds outdated software via Microsoft WinGet and updates one app or all of them silently. |
-| **Disk analyzer** | Scans any drive or folder in a background thread. Interactive treemap, drill-down, file-type breakdown and the largest files. |
-| **Duplicates** | Finds identical files by content (size → partial hash → full SHA-1), always keeps one copy, auto-selects all but the newest/oldest. |
-| **Tools** | Create a restore point, flush DNS, empty the Recycle Bin, and quick access to 20+ Windows utilities. |
-| **History** | Every change Aster makes, with one-click restore of registry backups. |
+|  |  |
+| --- | --- |
+| ⚡ **Smart Scan** | One click checks junk, registry or leftovers, optimizations, startup apps and updates. **Fix everything** cleans what is safe and tells you what else is worth a look. |
+| 🧹 **Cleaner that explains itself** | System junk, 8 browsers and dozens of apps. Every item shows where it's stored on which drive, what it contains (“no passwords, bookmarks or logins”), what you'd notice afterwards, and a verdict: **Safe** · **Read first** · **Keep**. |
+| 🗂️ **Registry & leftovers** | Windows: a registry cleaner with 13 categories and automatic `.reg` backups, plus a full registry editor. macOS: settings, caches, containers and agents of apps you already deleted. |
+| 📦 **Complete uninstaller** | Runs the real uninstaller (or moves the app to the Trash on a Mac), then sweeps up the folders, settings and registry keys it left behind. Batch uninstall, last-opened dates on Mac. |
+| 🚀 **Startup & optimizer** | Startup apps, tasks, services, login items and launch agents — switched the same way the OS does it. Reversible tweaks with their trade-offs, power plans, apps hogging memory. |
+| 🔄 **Updates** | WinGet on Windows; macOS, Homebrew and App Store updates on a Mac — one app or all at once. |
+| 🧭 **Disk analyzer & duplicates** | Treemap of any drive, file types, the largest files — and for each one, *what it is, which program owns it and whether deleting it breaks anything*. Content-based duplicate finder across drives. |
+| 🔍 **Filters everywhere** | Drive, size, date, type, publisher, verdict, last opened… Every list can be narrowed down, and every option shows how many items it matches. |
+| ↩️ **Undo-friendly** | Your files go to the Recycle Bin / Trash, registry changes are backed up first, and **History** restores any backup in one click. |
+| 🌗 **Feels native** | Light and dark themes, native title bar and window controls, Full Disk Access guidance on Mac, works without admin rights. |
+
+## Download
 
 <p align="center">
-  <img src="docs/screenshots/cleaner.png" alt="Cleaner" width="430">
-  <img src="docs/screenshots/registry.png" alt="Registry cleaner" width="430">
-  <img src="docs/screenshots/programs.png" alt="Programs and uninstaller" width="430">
-  <img src="docs/screenshots/disk.png" alt="Disk analyzer" width="430">
+  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest/download/Aster-Windows-Setup.exe"><img alt="Download for Windows" src="https://img.shields.io/badge/Download-Windows-5B4CF0?style=for-the-badge&logo=windows&logoColor=white"></a>
+  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest/download/Aster-Mac-AppleSilicon.dmg"><img alt="Download for Mac (Apple silicon)" src="https://img.shields.io/badge/Download-Mac%20·%20Apple%20silicon-5B4CF0?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest/download/Aster-Mac-Intel.dmg"><img alt="Download for Mac (Intel)" src="https://img.shields.io/badge/Download-Mac%20·%20Intel-555555?style=for-the-badge&logo=apple&logoColor=white"></a>
 </p>
 
-## Windows and macOS
+| System | Package | Notes |
+| --- | --- | --- |
+| **Windows 10 / 11** | `Aster-Setup-<version>.exe` | Installer, per-user, no admin needed |
+| Windows 10 / 11 | `Aster-<version>-portable.exe` | Runs without installing |
+| **macOS 12+**, Apple silicon | `Aster-<version>-mac-arm64.dmg` | M1 – M4 |
+| macOS 12+, Intel | `Aster-<version>-mac-x64.dmg` | |
 
-| | Windows | macOS |
-|---|---|---|
-| **Cleaner** | Temp, Windows Update, error reports, shader caches, 7 browsers, apps | ~/Library caches, logs, crash reports, Quick Look, Trash, iOS updates, Safari + 7 browsers, Xcode, Homebrew, apps |
-| **Registry / Leftovers** | Registry cleaner (13 categories, .reg backups) + full registry editor | Leftovers of removed apps: preferences, caches, containers, saved state, broken launch agents (to the Trash) |
-| **Programs** | Runs the real uninstaller, then removes leftover folders and registry keys | Quits the app, moves it to the Trash, removes its ~/Library data; shows when each app was last opened |
-| **Startup** | Run keys, startup folders, scheduled tasks, services | Login items, launch agents, background daemons |
-| **Updates** | WinGet | macOS updates, Homebrew formulae & casks, Mac App Store (via `mas`) |
-| **Optimize** | 16 tweaks, power plans | Animations, Dock, Spotlight, Low Power Mode, .DS_Store, privacy |
-| **Settings** | Refresh rate & resolution, Explorer, taskbar | Finder, Dock, keyboard & trackpad, screenshots, appearance |
-| **Tools** | Restore point, DNS flush, Windows utilities | Time Machine snapshots, free purgeable space, Spotlight rebuild, DNS flush |
+Get them from the **[latest release](https://github.com/Nikita-Shulga/Aster/releases/latest)**. Each release also has `SHA256SUMS.txt` for verifying the downloads.
 
-## Install
+**Windows:** run the installer (or the portable exe). The app isn't code-signed yet, so SmartScreen may warn you the first time: click **More info → Run anyway**.
 
-Download the latest release from the [Releases page](https://github.com/Nikita-Shulga/Aster/releases):
+**macOS:** open the DMG and drag **Aster** to **Applications**. The Mac build is ad hoc signed, not notarized, so the first launch needs **System Settings → Privacy & Security → Open Anyway**. To clean Safari, Mail and the Trash, allow **Full Disk Access** — Aster shows a button for it. Details in [docs/MAC.md](docs/MAC.md).
 
-- **`Aster-Setup-x.y.z.exe`** — installer (per-user, no admin needed)
-- **`Aster-x.y.z-portable.exe`** — portable, runs without installing
+## Quick start
 
-**Windows** 10 or 11 (x64). Builds are currently unsigned, so Windows SmartScreen may show a warning on first launch — choose **More info → Run anyway**.
+1. **Open Aster** and press **Run Smart Scan** on the Overview.
+2. **Look at the results.** Click any card — Junk files, Registry/Leftovers, Optimizations, Startup, Updates — to see the details and the reasoning behind each item.
+3. **Press Fix everything**, or clean area by area. Only safe items are pre-selected; anything you'd notice is listed separately before you confirm.
 
-**macOS** 12 Monterey or later — download `Aster-x.y.z-mac-arm64.dmg` for Apple Silicon (M1–M4) or `…-mac-x64.dmg` for Intel Macs, and drag Aster to Applications. The app is not notarized yet, so the first time:
+> [!TIP]
+> Some areas — the Windows Update cache, machine-wide registry keys, services — need administrator rights on Windows: use **Restart as administrator** in the sidebar. On a Mac, the equivalent is **Full Disk Access**.
 
-1. Open Aster from Applications. macOS says it can't verify the developer — click **Done**.
-2. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Aster.
+## How it works
 
-If macOS reports the app is "damaged", run `xattr -cr /Applications/Aster.app` in Terminal once.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/how-it-works-dark.svg">
+    <img src="docs/images/how-it-works-light.svg" alt="Scan (read-only), Explain (every item says what it is, what you lose and whether it is safe), You choose (before and after preview), Clean safely (caches deleted, your files go to the Trash, registry is backed up)" width="100%">
+  </picture>
+</p>
 
-### Full Disk Access (macOS)
+| What Aster changes | What actually happens | Can you undo it? |
+| --- | --- | --- |
+| **Caches and temporary files** | Deleted. Temp files newer than 24 h, files in use and folders you exclude are skipped. Links are never followed. | Not needed — they rebuild automatically |
+| **Your files** (disk analyzer, duplicates, leftovers) | Moved to the Recycle Bin / Trash | ✅ Put them back from the Recycle Bin / Trash |
+| **Registry** (Windows) | Exported to a `.reg` backup, then changed | ✅ **History → Restore** |
+| **Startup items** | Switched with the same flags Task Manager / System Settings use; deletions are backed up | ✅ Switch back, or restore from History |
+| **Settings & optimizations** | One setting at a time, with a before → after preview | ✅ Switch back on the same page |
+| **Uninstalling** | The program's own uninstaller (Windows) or Trash (Mac), then a leftover review | Reinstall the app |
 
-macOS protects Safari, Mail, the Trash and other apps' data even from you. To clean those, allow Aster in **System Settings → Privacy & Security → Full Disk Access** — Aster shows a button for this in the sidebar. Everything else works without it.
+The Windows and Mac versions share one interface but are built natively: the Windows side works with the registry, PowerShell, WinGet and Explorer; the Mac side with `~/Library`, `launchctl`, `defaults`, Homebrew and Time Machine. Protected Windows registry roots can't be deleted, and Aster never touches Apple's own files.
 
-### Administrator mode (Windows)
+## Screenshots
 
-Aster runs as a standard user by default. Some areas — the Windows Update cache, system temp and logs, machine-wide registry keys, services and restore points — need administrator rights. Click **Restart as administrator** in the sidebar when you need them.
+<table>
+  <tr>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/cleaner-dark.png"><img src="docs/images/cleaner-light.png" alt="Cleaner with an item expanded: what it is, what you lose, the recommendation and where it is stored"></picture><p align="center"><b>Cleaner</b> — every item explained</p></td>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/disk-dark.png"><img src="docs/images/disk-light.png" alt="Disk analyzer with treemap, Delete? verdicts and largest files"></picture><p align="center"><b>Disk analyzer</b> — what is it, and can I delete it?</p></td>
+  </tr>
+  <tr>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/programs-dark.png"><img src="docs/images/programs-light.png" alt="Programs list with drive, publisher, size and install date filters"></picture><p align="center"><b>Programs</b> — uninstall completely</p></td>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/optimize-dark.png"><img src="docs/images/optimize-light.png" alt="Optimize page with recommended tweaks, power plans and trade-offs"></picture><p align="center"><b>Optimize</b> — reversible, with trade-offs</p></td>
+  </tr>
+</table>
 
-## Safety model
+<sub>All screenshots use Aster's built-in sample data.</sub>
 
-| Action | What happens |
-|---|---|
-| Cleaning caches and temp files | Permanently deleted (they're regenerated automatically). Temp files newer than 24 h are skipped. Files in use are skipped. Folders you exclude in Settings are never touched. |
-| Registry fixes and edits (Windows) | Exported to a `.reg` backup in `%APPDATA%\Aster\backups` *before* the change. Restore from History. |
-| Leftovers, duplicates, disk analyzer deletions | Moved to the Recycle Bin / Trash. |
-| macOS leftovers, apps, launch agents | Moved to the Trash. |
-| Startup changes | Disabling uses Windows' `StartupApproved` flags (like Task Manager). Deleting a registry entry is backed up first; deleting a scheduled task saves its XML. |
-| Uninstalling | Always runs the program's own uninstaller (or `Remove-AppxPackage` for Store apps). |
+## FAQ
 
-Aster never follows symbolic links or junctions while cleaning, refuses to clean shallow paths such as drive roots, and won't delete critical registry roots (`HKLM\SYSTEM`, `HKCU\Software`, `…\Microsoft`, etc.).
+<details>
+<summary><b>Will cleaning make my computer faster?</b></summary>
 
-## Development
+Sometimes a little — mostly it frees disk space, which matters a lot when a drive is nearly full. Aster is honest about it: clearing caches doesn't speed anything up by itself, and registry cleaning is housekeeping, not a performance boost. The real speed wins are on the **Startup** and **Optimize** pages, and Aster says so.
+</details>
 
-Aster is an Electron app with no runtime dependencies and no build step for the UI.
+<details>
+<summary><b>Can I break something?</b></summary>
 
-```bash
+Aster is built to make that hard. Only items marked **Safe** are pre-selected. Anything you would notice — signing out of websites, losing open tabs, emptying the Recycle Bin — is listed separately before you confirm. Your own files go to the Recycle Bin / Trash, registry changes are backed up and restorable from **History**, and protected Windows keys and Apple's files are off-limits.
+</details>
+
+<details>
+<summary><b>Does it delete my passwords, bookmarks or logins?</b></summary>
+
+No. Browser cache cleaning never touches passwords, bookmarks or history. Cookies (which keep you signed in) and history are separate items, are **not** selected by default, and are marked so you know what they do.
+</details>
+
+<details>
+<summary><b>Why does it need administrator rights / Full Disk Access?</b></summary>
+
+It doesn't for most things. On Windows, a few system areas (Windows Update cache, system temp, machine-wide registry keys, services, restore points) need admin rights — use **Restart as administrator** when you want them. On macOS, Apple protects Safari, Mail and the Trash even from you, so cleaning those needs **Full Disk Access**. Everything else works without it.
+</details>
+
+<details>
+<summary><b>Does Aster send anything over the internet?</b></summary>
+
+No telemetry, no account, no analytics. The only network activity is when you press **Check for updates**, which asks WinGet (Windows) or Homebrew / Apple (Mac).
+</details>
+
+<details>
+<summary><b>Why does Windows or macOS warn about an unknown developer?</b></summary>
+
+The builds aren't code-signed or notarized yet. You can check each download against `SHA256SUMS.txt` in the release, or [build it yourself](#build-from-source).
+</details>
+
+## Build from source
+
+You need [Node.js](https://nodejs.org) 22 or newer. There are no runtime dependencies — the UI is plain JavaScript and CSS.
+
+```sh
+git clone https://github.com/Nikita-Shulga/Aster.git
+cd Aster
 npm install
-npm start            # run the app
-npm test             # backend tests (uses disposable fixtures and a throwaway HKCU\Software\AsterSelfTest key)
-npm run preview      # UI with sample data at http://127.0.0.1:4173 (no system access)
-npm run dist         # Windows: installer + portable exe into dist/
-npm run dist:mac     # macOS (run on a Mac): DMG + ZIP for Apple Silicon and Intel
+npm start              # run the app
+npm test               # tests for your platform (fixtures and throwaway keys only)
+npm run preview        # the UI with sample data at http://127.0.0.1:4173 (?platform=darwin for the Mac UI)
+npm run dist           # Windows: installer + portable exe in dist/
+npm run dist:mac       # macOS (on a Mac): DMG + ZIP for Apple silicon and Intel
 ```
 
+### Project layout
+
 ```
-src/
-  main/        Electron main process — Windows implementation (registry, PowerShell, WinGet…)
-    mac/       macOS implementation of the same API (defaults, launchctl, plists, Homebrew…)
-    main.cjs   picks the platform layer, window, IPC routing and security policy
-  renderer/    UI: index.html, styles.css (design system), js/pages/*
-scripts/       preview server, icon renderer, screenshot capture, self-test
-test/          node:test suites
+src/main/        Electron main process — Windows implementation (registry, PowerShell, WinGet…)
+src/main/mac/    macOS implementation of the same API (defaults, launchctl, plists, Homebrew…)
+src/renderer/    sandboxed UI: design system (styles.css), pages, filters, sample data
+scripts/         preview server, icon and README artwork generators, self-test
+test/            node:test suites for Windows and macOS
+docs/            macOS notes, images
 ```
 
-Security: the renderer is sandboxed with context isolation, a strict CSP and no Node access. It talks to the main process through a single allow-listed `invoke` bridge. All PowerShell scripts are fixed in the source; renderer data reaches them only as JSON on stdin, never by string interpolation. On macOS, tools are run directly with argument arrays (no shell); the few actions that need administrator rights use the standard macOS password prompt.
+### Releasing
 
-Every push is built and tested on real Windows and macOS machines by GitHub Actions (see `.github/workflows/build.yml`); tags create a release with both platforms' installers.
+Bump the version in `package.json`, add a section to `CHANGELOG.md`, then push a tag such as `v2.1.0`. GitHub Actions tests and builds both platforms on real Windows and macOS machines — including a self-test that drives the real app through every page — and attaches all downloads to a draft release.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. Start with **[CONTRIBUTING.md](CONTRIBUTING.md)** — it explains how the pieces fit together and the rule every change must keep: *explain before you change anything, and keep it undoable.*
+
+- 🐞 [Report a bug](https://github.com/Nikita-Shulga/Aster/issues/new?template=bug_report.yml)
+- 💡 [Suggest a feature](https://github.com/Nikita-Shulga/Aster/issues/new?template=feature_request.yml)
+- 🔐 [Report a vulnerability privately](https://github.com/Nikita-Shulga/Aster/security/advisories/new)
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). For questions, see [SUPPORT.md](SUPPORT.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 Nikita Shulga
+[MIT](LICENSE) © 2026 [Nikita Shulga](https://nikitashulga.com)
+
+Electron keeps its own license, shipped inside every release. The Inter typeface is used under the SIL Open Font License.
+
+<sub>Aster is an independent project, not affiliated with or endorsed by Microsoft, Apple, Piriform (CCleaner), ChemTable (Reg Organizer) or any other company mentioned. Windows is a trademark of Microsoft; macOS and Safari are trademarks of Apple.</sub>

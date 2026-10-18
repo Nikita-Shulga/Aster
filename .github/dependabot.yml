@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Keep the GitHub Actions used by the build and release workflow up to date.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  # Electron security releases.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: electron

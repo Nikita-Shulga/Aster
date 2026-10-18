@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-label="Aster — A cleaner, faster, tidier computer.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FAFAFB"/>
+      <stop offset="1" stop-color="#F1EEFF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7C6DFF" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#7C6DFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8576FF"/>
+      <stop offset="1" stop-color="#4A36E0"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#4A36E0" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+  <rect x=".5" y=".5" width="1279" height="319" rx="23.5" fill="none" stroke="#E4E4E7"/>
+  <ellipse cx="300" cy="160" rx="300" ry="210" fill="url(#glow)"/>
+  <g transform="translate(205 65)" filter="url(#shadow)">
+    <rect width="190" height="190" rx="48" fill="url(#tile)"/>
+    <g transform="translate(95 95) scale(2.97)">
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".96"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".62" transform="rotate(45)"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".96" transform="rotate(90)"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".62" transform="rotate(135)"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".96" transform="rotate(180)"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".62" transform="rotate(225)"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".96" transform="rotate(270)"/>
+      <ellipse cx="0" cy="-10.5" rx="3.9" ry="9" fill="#fff" fill-opacity=".62" transform="rotate(315)"/>
+      <circle r="5.2" fill="#FFD166"/>
+    </g>
+  </g>
+  <text x="530" y="158" fill="#18181B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="96" font-weight="600" letter-spacing="-3">Aster</text>
+  <text x="534" y="214" fill="#3F3F46" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="32" font-weight="400" letter-spacing="-0.5">A cleaner, faster, tidier computer.</text>
+  <text x="534" y="258" fill="#71717A" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="21" font-weight="400">Clean, uninstall, optimize and update — on Windows and macOS.</text>
+</svg>

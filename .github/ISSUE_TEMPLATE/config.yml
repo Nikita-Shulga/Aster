@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Nikita-Shulga/Aster/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Aster on macOS
+    url: https://github.com/Nikita-Shulga/Aster/blob/main/docs/MAC.md
+    about: First launch, Full Disk Access and permission prompts. Worth a look before reporting a Mac problem.

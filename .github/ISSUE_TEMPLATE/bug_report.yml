@@ -1,0 +1,74 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! Please don't attach full file lists or anything containing personal paths.
+  - type: dropdown
+    id: page
+    attributes:
+      label: Which part of Aster?
+      multiple: true
+      options:
+        - Overview / Smart Scan
+        - Cleaner
+        - Registry (Windows) / Leftovers (macOS)
+        - Optimize
+        - Startup
+        - Programs / uninstall
+        - Updates
+        - Disk analyzer
+        - Duplicates
+        - Windows / Mac settings
+        - Tools
+        - History / restore
+        - Installation / first launch
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: For example, "the Cleaner said 2 GB but freed nothing" or "uninstalling X left its folder behind".
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Cleaner
+        2. Expand "Google Chrome · Cache"
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Aster version
+      placeholder: "2.0.0 (shown in Settings → About)"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 25H2 / macOS 15.6 (Apple silicon)
+    validations:
+      required: true
+  - type: dropdown
+    id: rights
+    attributes:
+      label: Access level
+      options:
+        - Windows, standard mode
+        - Windows, restarted as administrator
+        - macOS, without Full Disk Access
+        - macOS, with Full Disk Access

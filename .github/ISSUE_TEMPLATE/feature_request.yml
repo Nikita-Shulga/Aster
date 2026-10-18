@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an idea for Aster
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Aster to do?
+      description: A new cleaning location, a tweak, a filter, a way to explain something better…
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: When would it help?
+      description: Describe the situation. For example, "my Steam library is on another drive and…"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you've tried instead?

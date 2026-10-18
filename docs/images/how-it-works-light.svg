@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="330" viewBox="0 0 1280 330" role="img" aria-label="How Aster works: scan read-only, explain every item, you choose with a before and after preview, then clean safely with backups and the Trash.">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FAFAFB"/><stop offset="1" stop-color="#F1EEFF"/></linearGradient>
+  <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5B4CF0"/></marker></defs>
+  <rect width="1280" height="330" rx="24" fill="url(#bg)"/>
+  <rect x=".5" y=".5" width="1279" height="329" rx="23.5" fill="none" stroke="#E4E4E7"/>
+  <g>
+    <rect x="40" y="40" width="262" height="200" rx="18" fill="#FFFFFF" stroke="#E4E4E7"/>
+    <rect x="62" y="62" width="52" height="52" rx="14" fill="#EEECFF"/>
+    <g transform="translate(88 88)" fill="none" stroke="#5B4CF0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M-14 -2a12 12 0 1 0 24 0a12 12 0 1 0 -24 0M7 7l10 10"/></g>
+    <text x="278" y="98" text-anchor="end" fill="#71717A" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">STEP 1</text>
+    <text x="64" y="152" fill="#18181B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" letter-spacing="-0.5">Scan</text>
+    <text x="64" y="182" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">Read-only. Nothing</text><text x="64" y="204" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">changes while Aster</text><text x="64" y="226" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">looks around.</text>
+    </g><path d="M310 140H342.6666666666667" stroke="#5B4CF0" stroke-width="3" marker-end="url(#ar)"/>
+  <g>
+    <rect x="352.6666666666667" y="40" width="262" height="200" rx="18" fill="#FFFFFF" stroke="#E4E4E7"/>
+    <rect x="374.6666666666667" y="62" width="52" height="52" rx="14" fill="#EEECFF"/>
+    <g transform="translate(400.6666666666667 88)" fill="none" stroke="#5B4CF0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M-14 -12h28M-14 -2h28M-14 8h18"/></g>
+    <text x="590.6666666666667" y="98" text-anchor="end" fill="#71717A" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">STEP 2</text>
+    <text x="376.6666666666667" y="152" fill="#18181B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" letter-spacing="-0.5">Explain</text>
+    <text x="376.6666666666667" y="182" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">Every item says what</text><text x="376.6666666666667" y="204" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">it is, what you lose</text><text x="376.6666666666667" y="226" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">and whether it’s safe.</text>
+    </g><path d="M622.6666666666667 140H655.3333333333334" stroke="#5B4CF0" stroke-width="3" marker-end="url(#ar)"/>
+  <g>
+    <rect x="665.3333333333334" y="40" width="262" height="200" rx="18" fill="#FFFFFF" stroke="#E4E4E7"/>
+    <rect x="687.3333333333334" y="62" width="52" height="52" rx="14" fill="#EEECFF"/>
+    <g transform="translate(713.3333333333334 88)" fill="none" stroke="#5B4CF0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M-13 0l8 8l18 -18"/></g>
+    <text x="903.3333333333334" y="98" text-anchor="end" fill="#71717A" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">STEP 3</text>
+    <text x="689.3333333333334" y="152" fill="#18181B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" letter-spacing="-0.5">You choose</text>
+    <text x="689.3333333333334" y="182" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">See before → after.</text><text x="689.3333333333334" y="204" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">Untick anything you</text><text x="689.3333333333334" y="226" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">want to keep.</text>
+    </g><path d="M935.3333333333334 140H968" stroke="#5B4CF0" stroke-width="3" marker-end="url(#ar)"/>
+  <g>
+    <rect x="978" y="40" width="262" height="200" rx="18" fill="#FFFFFF" stroke="#E4E4E7"/>
+    <rect x="1000" y="62" width="52" height="52" rx="14" fill="#EEECFF"/>
+    <g transform="translate(1026 88)" fill="none" stroke="#5B4CF0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M-12 -12h24l-2 26h-20zM-16 -12h32M-5 -18h10"/></g>
+    <text x="1216" y="98" text-anchor="end" fill="#71717A" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">STEP 4</text>
+    <text x="1002" y="152" fill="#18181B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" letter-spacing="-0.5">Clean safely</text>
+    <text x="1002" y="182" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">Caches are deleted, your</text><text x="1002" y="204" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">files go to the Trash,</text><text x="1002" y="226" fill="#52525B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="16.5">registry is backed up.</text>
+    </g>
+  <g transform="translate(352.6666666666667 268)">
+    <text x="0" y="17" fill="#71717A" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15.5">Every item gets a verdict:</text>
+    <rect x="190" y="-4" width="146.39999999999998" height="30" rx="15" fill="#E6F6EC"/><text x="203" y="16" fill="#0D7A3B" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Safe to delete</text><rect x="360" y="-4" width="112" height="30" rx="15" fill="#FFF4DD"/><text x="373" y="16" fill="#9A6200" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Read first</text><rect x="530" y="-4" width="146.39999999999998" height="30" rx="15" fill="#FDECEC"/><text x="543" y="16" fill="#B32424" font-family="Inter, 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Better to keep</text>
+  </g>
+</svg>
