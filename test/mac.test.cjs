@@ -59,6 +59,29 @@ test('temporary files: only old files are removed, links are not followed', asyn
   } finally { process.env.TMPDIR = prev; }
 });
 
+test('cleaner: single files and single locations can be cleaned on their own', async () => {
+  const tmp = path.join(fixture, 'T2');
+  fs.mkdirSync(path.join(tmp, 'a'), {recursive: true}); fs.mkdirSync(path.join(tmp, 'b'), {recursive: true});
+  const old = p => { fs.writeFileSync(p, 'x'.repeat(500)); const t = Date.now() / 1000 - 200 * 3600; fs.utimesSync(p, t, t); };
+  old(path.join(tmp, 'a', 'one.tmp')); old(path.join(tmp, 'a', 'two.tmp')); old(path.join(tmp, 'b', 'three.tmp'));
+  const secret = path.join(fixture, 'secret.txt'); old(secret);
+  const prev = process.env.TMPDIR; process.env.TMPDIR = tmp;
+  const trashed = [];
+  try {
+    const {Cleaner} = require('../src/main/cleaner.cjs');
+    const c = new Cleaner({getSettings: () => ({exclusions: []}), getDrives: async () => [], trash: async p => { trashed.push(p); fs.rmSync(p); }});
+    // One file goes to the Trash; a path outside the item is refused.
+    const r = await c.removeFiles({id: 'macos.temp', paths: [path.join(tmp, 'a', 'one.tmp'), secret, path.join(tmp, 'a', '..', '..', 'secret.txt')]});
+    assert.deepStrictEqual(r.done, [path.join(tmp, 'a', 'one.tmp')]);
+    assert.strictEqual(r.failed.length, 2);
+    assert.ok(fs.existsSync(secret));
+    // Per-app cache locations: only the chosen folder is cleaned.
+    const {allRules} = require('../src/main/mac/cleaner-rules.cjs');
+    const caches = allRules().find(x => x.id === 'macos.appcaches').resolve();
+    assert.ok(caches.length > 1 && caches.every(t => t.dir.startsWith(path.join(os.homedir(), 'Library', 'Caches'))));
+  } finally { process.env.TMPDIR = prev; }
+});
+
 test('programs: lists app bundles with identifiers and finds leftovers', async () => {
   const {MacPrograms} = require('../src/main/mac/programs.cjs');
   const p = new MacPrograms({store, getIcon: async () => null, trash: async () => {}});

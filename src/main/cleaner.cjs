@@ -88,7 +88,7 @@ async function recycleBinTargets(drives) {
 }
 
 class Cleaner {
-  constructor({getSettings, getDrives}) { this.getSettings = getSettings; this.getDrives = getDrives; this.abort = null; }
+  constructor({getSettings, getDrives, trash}) { this.getSettings = getSettings; this.getDrives = getDrives; this.trash = trash; this.abort = null; }
 
   rules() {
     return {groups: GROUPS, rules: allRules().map(r => ({
@@ -142,9 +142,10 @@ class Cleaner {
   }
 
   // drives: optional list like ['D:'] — only locations on those drives are cleaned.
-  async clean({ids, closeApps = false, drives = null, onProgress = () => {}}) {
+  // paths: optional list of locations (as reported by analyze) — only those are cleaned.
+  async clean({ids, closeApps = false, drives = null, paths = null, onProgress = () => {}}) {
     const wanted = new Set(ids);
-    const onDrive = t => !drives || drives.includes(volumeOf(t.dir || t.file));
+    const onDrive = t => (!drives || drives.includes(volumeOf(t.dir || t.file))) && (!paths || paths.includes(t.dir || t.file));
     const rules = allRules().filter(r => wanted.has(r.id));
     let procs = await runningProcesses();
     if (closeApps) {
@@ -193,5 +194,28 @@ class Cleaner {
     return {results, cancelled: ctx.signal.aborted, freed: results.reduce((n, r) => n + r.freed, 0), deleted: results.reduce((n, r) => n + r.deleted, 0), skipped: results.reduce((n, r) => n + r.skipped, 0)};
   }
 }
+
+// Moves individual files the user picked to the Trash / Recycle Bin. Each file must lie inside one of the
+// rule's own locations, so a forged path can never reach anything else.
+Cleaner.prototype.removeFiles = async function ({id, paths}) {
+  const rule = allRules().find(r => r.id === id);
+  if (!rule) throw new Error('Analyze again and retry.');
+  const targets = await this.targetsFor(rule);
+  const exclusions = (this.getSettings().exclusions || []).filter(Boolean);
+  const inside = p => targets.some(t => t.file ? under(p, [path.resolve(t.file)]) : under(p, [path.resolve(t.dir)]) && p !== path.resolve(t.dir) && (t.recursive || path.dirname(p) === path.resolve(t.dir)) && (!t.match || t.match.test(path.basename(p))) && !(t.exclude && under(p, t.exclude)));
+  const done = [], failed = [];
+  let freed = 0;
+  for (const raw of (Array.isArray(paths) ? paths : []).slice(0, 500)) {
+    const p = typeof raw === 'string' && path.isAbsolute(raw) ? path.resolve(raw) : null;
+    if (!p || !inside(p) || (exclusions.length && under(p, exclusions))) { failed.push({path: raw, error: 'Not part of this item.'}); continue; }
+    try {
+      const st = await fs.lstat(p);
+      if (!st.isFile()) throw new Error('Not a file.');
+      await this.trash(p);
+      done.push(p); freed += st.size;
+    } catch (e) { failed.push({path: p, error: e.message}); }
+  }
+  return {done, failed, freed};
+};
 
 module.exports = {Cleaner, runningProcesses, walk, isSafeTarget};

@@ -119,7 +119,7 @@ async function main() {
   const store = new Store(app.getPath('userData'));
   let sysInfo = null;
   const getDrives = async () => (sysInfo || (sysInfo = await system.info())).drives;
-  const cleaner = new Cleaner({getSettings: () => store.getSettings(), getDrives});
+  const cleaner = new Cleaner({getSettings: () => store.getSettings(), getDrives, trash});
   const registry = new P.Registry({store, trash});
   const programs = new P.Programs({store, getIcon, trash});
   const startup = new P.Startup({store, getIcon, trash});
@@ -157,8 +157,14 @@ async function main() {
     'cleaner.analyze': a => cleaner.analyze({ids: a.ids, onProgress: p => send('cleaner', p)}),
     'cleaner.clean': async a => {
       const drives = Array.isArray(a.drives) ? a.drives.filter(d => typeof d === 'string' && d.length < 200 && (isMac || /^[A-Z]:$/.test(d))) : null;
-      const r = await cleaner.clean({ids: a.ids, closeApps: !!a.closeApps, drives: drives?.length ? drives : null, onProgress: p => send('cleaner', p)});
+      const paths = Array.isArray(a.paths) ? a.paths.filter(p => typeof p === 'string' && path.isAbsolute(p)).slice(0, 50) : null;
+      const r = await cleaner.clean({ids: a.ids, closeApps: !!a.closeApps, drives: drives?.length ? drives : null, paths: paths?.length ? paths : null, onProgress: p => send('cleaner', p)});
       if (r.deleted > 0 || r.freed > 0) store.log({kind: 'clean', title: `Cleaned ${r.deleted.toLocaleString()} files`, bytes: r.freed, count: r.deleted});
+      return r;
+    },
+    'cleaner.removeFiles': async a => {
+      const r = await cleaner.removeFiles({id: String(a?.id || ''), paths: a?.paths});
+      if (r.done.length) store.log({kind: 'trash', title: `Moved ${r.done.length} file${r.done.length === 1 ? '' : 's'} to the ${isMac ? 'Trash' : 'Recycle Bin'}`, bytes: r.freed, count: r.done.length});
       return r;
     },
     'cleaner.cancel': () => { cleaner.cancel(); return {ok: true}; },

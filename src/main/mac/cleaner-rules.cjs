@@ -102,7 +102,11 @@ const SYSTEM = [
     contains: 'Cached data that all your other apps keep in ~/Library/Caches: downloaded images, previews, update files and similar. Only files not touched in the last 24 hours are removed.',
     ifDeleted: 'Apps may start a little slower once and download some content again. Your documents and settings are not here.',
     advice: 'Safe to clean. Quit apps you use heavily first for the best result.'
-  }, () => [{dir: CACHES, recursive: true, minAgeHours: 24, exclude: OWN_CACHE_RULES, label: 'Your app caches (~/Library/Caches)'}]),
+  // One location per app folder, so a single app's cache can be cleaned on its own.
+  }, () => [
+    ...subdirs(CACHES).filter(d => !OWN_CACHE_RULES.includes(d)).map(dir => ({dir, recursive: true, minAgeHours: 24, label: path.basename(dir)})),
+    {dir: CACHES, recursive: false, minAgeHours: 24, label: 'Loose files in ~/Library/Caches'}
+  ]),
   mac('logs', 'App logs', {
     contains: 'Text logs that apps write to record what they did (~/Library/Logs).',
     ifDeleted: 'Nothing you would notice. Only useful when troubleshooting a specific app.',
