@@ -120,7 +120,9 @@ Out-Json ([pscustomobject]@{ ok = $true })
 
 const ADD = S.LIB + String.raw`
 # $in: { name, command }
-$k = Open-RegKey 'HKCU\Software\Microsoft\Windows\CurrentVersion\Run' $true
+# The Run key may not exist yet on a fresh account; CreateSubKey opens or creates it.
+$base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryView]::Registry64)
+try { $k = $base.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Run', $true) } finally { $base.Close() }
 try { if ($k.GetValueNames() -contains $in.name) { throw 'An entry with this name already exists.' }; $k.SetValue([string]$in.name, [string]$in.command, [Microsoft.Win32.RegistryValueKind]::String) } finally { $k.Close() }
 Out-Json ([pscustomobject]@{ ok = $true })
 `;
