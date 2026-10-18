@@ -114,6 +114,7 @@ function systemCard() {
       <div class="spec"><span class="k">Processor</span><span class="v truncate" title="${sys.cpu}">${sys.cpu}</span></div>
       ${sys.gpu?.length ? html`<div class="spec"><span class="k">Graphics</span><span class="v truncate" title="${sys.gpu.join(', ')}">${sys.gpu[0]}</span></div>` : ''}
       <div class="spec"><span class="k">Memory</span><span class="v">${bytes(sys.memory.total, 0)}</span></div>
+      ${sys.battery?.health ? html`<div class="spec"><span class="k">Battery</span><span class="v truncate" title="Maximum capacity compared with when it was new">${sys.battery.health}% health${sys.battery.cycles != null ? ` · ${num(sys.battery.cycles)} cycles` : ''}</span></div>` : ''}
       <div class="spec"><span class="k">Uptime</span><span class="v">${duration((s.live || sys).uptime)}</span></div>
     </div>
   </div>`;
