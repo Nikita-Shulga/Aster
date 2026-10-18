@@ -102,7 +102,11 @@ const SYSTEM = [
     contains: 'Cached data that all your other apps keep in ~/Library/Caches: downloaded images, previews, update files and similar. Only files not touched in the last 24 hours are removed.',
     ifDeleted: 'Apps may start a little slower once and download some content again. Your documents and settings are not here.',
     advice: 'Safe to clean. Quit apps you use heavily first for the best result.'
-  }, () => [{dir: CACHES, recursive: true, minAgeHours: 24, exclude: OWN_CACHE_RULES, label: 'Your app caches (~/Library/Caches)'}]),
+  // One location per app folder, so a single app's cache can be cleaned on its own.
+  }, () => [
+    ...subdirs(CACHES).filter(d => !OWN_CACHE_RULES.includes(d)).map(dir => ({dir, recursive: true, minAgeHours: 24, label: path.basename(dir)})),
+    {dir: CACHES, recursive: false, minAgeHours: 24, label: 'Loose files in ~/Library/Caches'}
+  ]),
   mac('logs', 'App logs', {
     contains: 'Text logs that apps write to record what they did (~/Library/Logs).',
     ifDeleted: 'Nothing you would notice. Only useful when troubleshooting a specific app.',
@@ -168,6 +172,8 @@ const APPS = [
     contains: 'Cached images, profile pictures, previews and app code.', ifDeleted: 'Teams starts slower once. Chats and login are kept.', advice: 'Safe to clean.'}),
   app('vscode', 'Visual Studio Code', ['Code'], () => [...electron(path.join(SUPPORT, 'Code')), {dir: path.join(SUPPORT, 'Code', 'CachedData'), recursive: true, label: 'Cached editor code'}, {dir: path.join(SUPPORT, 'Code', 'CachedExtensionVSIXs'), recursive: true, label: 'Downloaded extension installers'}, {dir: path.join(SUPPORT, 'Code', 'logs'), recursive: true, label: 'Logs'}], {installed: () => exists(path.join(SUPPORT, 'Code')),
     contains: 'Editor caches, old extension installers and logs.', ifDeleted: 'VS Code starts slightly slower once. Settings, extensions and projects are kept.', advice: 'Safe to clean.'}),
+  ...[['claude', 'Claude', 'Claude'], ['cursor', 'Cursor', 'Cursor'], ['notion', 'Notion', 'Notion'], ['obsidian', 'Obsidian', 'obsidian']].map(([id, name, folder]) => app(id, name, [name], () => [...electron(path.join(SUPPORT, folder)), ...(id === 'cursor' ? [{dir: path.join(SUPPORT, folder, 'CachedData'), recursive: true, label: 'Cached editor code'}] : [])], {installed: () => exists(path.join(SUPPORT, folder)),
+    contains: 'Cached images, web content and the app’s compiled code.', ifDeleted: `${name} starts a little slower once. Your ${id === 'obsidian' ? 'vaults' : 'chats, documents'} and login are kept.`, advice: 'Safe to clean while the app is closed.'})),
   app('steam', 'Steam', ['steam_osx'], () => [{dir: path.join(SUPPORT, 'Steam', 'appcache', 'httpcache'), recursive: true, label: 'Store web cache'}], {installed: () => exists(path.join(SUPPORT, 'Steam')),
     contains: 'Cached Store and Community web pages. Not your games.', ifDeleted: 'Store pages load slower once.', advice: 'Safe to clean.'}),
   app('xcode', 'Xcode', ['Xcode'], () => [{dir: path.join(XCODE, 'Xcode', 'DerivedData'), recursive: true, label: 'DerivedData (build files)'}, {dir: path.join(XCODE, 'CoreSimulator', 'Caches'), recursive: true, label: 'Simulator caches'}], {installed: () => exists(path.join(XCODE, 'Xcode')), name: 'Build files (DerivedData)',

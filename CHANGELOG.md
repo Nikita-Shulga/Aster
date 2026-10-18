@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.0 — 2026-10-19
+
+### Cleaner: clean exactly what you want
+- **Delete a single file**: every file in “Show largest files” has its own Trash button (it goes to the Trash/Recycle Bin, so it can be put back). Up to the 40 largest files per item are listed.
+- **Clean a single location**: each location of an item has its own clean button, e.g. clean only Steam’s cache and keep the rest.
+- **App caches on Mac are split per app** (R, Steam, Epic, Zoom…), so one app’s cache can be cleaned on its own.
+- Long file paths no longer push the results off the edge of the window.
+
+### macOS fixes (tested on a MacBook Air M4, macOS 15.5)
+- **Memory usage** on Overview now matches Activity Monitor (app memory + wired + compressed). It used to show ~99% because macOS reports almost no "free" memory while it caches files.
+- **Leftovers no longer flags macOS's own folders** such as contactsd, tipsd, Animoji, DifferentialPrivacy and the Assistant/Baseband/Sync logs, or CUPS printing settings. Before, some of these were pre-selected as "Safe to fix".
+- **Leftovers recognises more installed apps**: data whose name differs from the app's bundle id (UltiMaker Cura → `cura`, Epic Games Launcher → `Epic`, Zoom → `ZoomPhone`, AmneziaVPN, Dropbox updater) is no longer offered for removal.
+- **Retina displays** are detected correctly in Display info.
+- **Safari, Mail and other Apple apps** can be quit from Optimize → running apps; before, they were locked as system processes.
+- **Empty the Trash** goes through Finder, so it works without Full Disk Access.
+
+### macOS additions
+- **Battery health** (maximum capacity and cycle count) on Overview for MacBooks.
+- **Tools → Free up memory**: runs `purge` to release inactive memory.
+- **New Mac settings**: Turn off Power Nap, keep background apps at full speed (App Nap), keep folders on top, show your Library folder, save new documents to this Mac instead of iCloud, expanded save dialogs.
+- **Cleaner**: caches of Claude, Cursor, Notion and Obsidian.
+
 ## 2.0.0 — 2026-10-19
 
 ### macOS

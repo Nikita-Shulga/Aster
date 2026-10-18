@@ -16,7 +16,8 @@ class MacDisplay {
       items.push({
         device: d._name || 'Display', name: d._name || 'Display', primary: d.spdisplays_main === 'spdisplays_yes',
         width: m ? +m[1] : null, height: m ? +m[2] : null, freq: m?.[3] ? Math.round(+m[3]) : null,
-        pixels: px ? `${px[1]} × ${px[2]}` : null, retina: /retina/i.test(res) || d.spdisplays_pixelresolution === 'spdisplays_retina',
+        pixels: px ? `${px[1]} × ${px[2]}` : null, // Retina panels render at a lower "looks like" resolution than their physical pixels.
+        retina: /retina/i.test(res) || d.spdisplays_pixelresolution === 'spdisplays_retina' || !!(px && m && +px[1] > +m[1]),
         modes: [], readOnly: true
       });
     }

@@ -1,7 +1,7 @@
 {
   "name": "aster",
   "productName": "Aster",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Aster — a fast, honest cleaner, optimizer and uninstaller for Windows and macOS.",
   "author": "Nikita Shulga",
   "license": "MIT",
@@ -54,7 +54,7 @@
       "darkModeSupport": true,
       "minimumSystemVersion": "12.0",
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "Aster uses System Events to list and manage your login items and to switch light/dark mode.",
+        "NSAppleEventsUsageDescription": "Aster uses System Events and Finder to manage your login items, switch light/dark mode and empty the Trash.",
         "NSDesktopFolderUsageDescription": "Aster analyzes folders you choose to show what takes up space.",
         "NSDocumentsFolderUsageDescription": "Aster analyzes folders you choose to show what takes up space.",
         "NSDownloadsFolderUsageDescription": "Aster can clean old installers from your Downloads folder."

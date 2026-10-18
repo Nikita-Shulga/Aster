@@ -38,10 +38,13 @@ export default definePage({
       if (id === 'bin') {
         const est = await api('cleaner.analyze', {ids: [s.catalog.binRule]}).catch(() => null);
         const where = isMac ? 'Trash' : 'Recycle Bin';
-        const {ok} = await modal({title: `Empty the ${where}?`, icon: 'trash', danger: true, confirm: 'Empty', body: `${est ? bytes(est.totalBytes) + ' will be permanently deleted. ' : ''}This can’t be undone.${isMac && app.system?.fda === false ? ' Aster needs Full Disk Access to empty the Trash.' : ''}`});
+        const {ok} = await modal({title: `Empty the ${where}?`, icon: 'trash', danger: true, confirm: 'Empty', body: `${est ? bytes(est.totalBytes) + ' will be permanently deleted. ' : ''}This can’t be undone.${isMac ? ' macOS may ask you once to let Aster control Finder.' : ''}`});
         if (!ok) return;
         s.busy.add(id); this.update();
-        try { const r = await api('cleaner.clean', {ids: [s.catalog.binRule]}); toast(`${where} emptied · ${bytes(r.freed)} freed`, {type: 'success'}); } finally { s.busy.delete(id); this.update(); }
+        try {
+          if (isMac) { await api('tools.run', {id}); toast(`Trash emptied${est?.totalBytes ? ` · ${bytes(est.totalBytes)} freed` : ''}`, {type: 'success'}); }
+          else { const r = await api('cleaner.clean', {ids: [s.catalog.binRule]}); toast(`${where} emptied · ${bytes(r.freed)} freed`, {type: 'success'}); }
+        } finally { s.busy.delete(id); this.update(); }
         return;
       }
       if (id === 'thin') {

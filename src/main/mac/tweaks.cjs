@@ -42,6 +42,14 @@ const T = [
     on: 'On', off: 'Off', get: async () => { const o = await sh('/usr/bin/pmset', ['-g']).catch(() => ''); return /lowpowermode\s+1/.test(o) ? true : /lowpowermode/.test(o) ? false : null; },
     set: async v => sudo(`/usr/bin/pmset -a lowpowermode ${v ? 1 : 0}`)},
 
+  {id: 'powerNap', group: 'performance', title: 'Turn off Power Nap', type: 'toggle', recommended: null, verdict: 'situational', admin: true,
+    what: 'Stops the Mac waking up briefly while asleep to check mail, sync iCloud and make Time Machine backups.', pro: 'Less battery drain overnight and a cooler Mac in a bag.', con: 'Mail, calendars and backups update only after you wake the Mac.',
+    on: 'Off', off: 'On', get: async () => { const o = await sh('/usr/bin/pmset', ['-g']).catch(() => ''); const m = /powernap\s+(\d)/.exec(o); return m ? m[1] === '0' : null; },
+    set: async v => sudo(`/usr/bin/pmset -a powernap ${v ? 0 : 1}`)},
+  {id: 'appNapOff', group: 'performance', title: 'Keep background apps at full speed', type: 'toggle', recommended: false, verdict: 'situational', restart: 'apps',
+    what: 'Turns off App Nap, which slows down apps whose windows are hidden.', pro: 'Long exports, downloads and renders keep full speed when you switch away.', con: 'More battery use and heat. Leave on unless a background task is noticeably slow.',
+    on: 'Full speed', off: 'App Nap', get: bt(G, 'NSAppSleepDisabled', false), set: async v => v ? write(G, 'NSAppSleepDisabled', 'bool', 'true') : del(G, 'NSAppSleepDisabled')},
+
   // ---------- Privacy ----------
   {id: 'adPersonal', group: 'privacy', title: 'Turn off personalized Apple ads', type: 'toggle', recommended: true, verdict: 'recommended',
     what: 'Apple stops using your activity to personalize ads in the App Store, Apple News and Stocks.', pro: 'Less profiling for advertising.', con: 'Ads are less relevant (you still see ads).',
@@ -76,6 +84,20 @@ const T = [
   {id: 'statusBar', group: 'explorer', title: 'Show status bar', type: 'toggle', recommended: null, verdict: 'preference', restart: 'explorer',
     what: 'Shows item count and free space at the bottom of Finder windows.', pro: 'See free disk space at a glance.', con: 'Takes a thin strip of window space.',
     on: 'Shown', off: 'Hidden', get: bt('com.apple.finder', 'ShowStatusBar', false), set: bs('com.apple.finder', 'ShowStatusBar')},
+  {id: 'foldersFirst', group: 'explorer', title: 'Keep folders on top', type: 'toggle', recommended: null, verdict: 'preference', restart: 'explorer',
+    what: 'Folders are listed before files when sorting by name, like on Windows.', pro: 'Easier to find folders in long lists.', con: 'None really.',
+    on: 'On top', off: 'Mixed', get: bt('com.apple.finder', '_FXSortFoldersFirst', false), set: bs('com.apple.finder', '_FXSortFoldersFirst')},
+  {id: 'showLibrary', group: 'explorer', title: 'Show your Library folder', type: 'toggle', recommended: null, verdict: 'preference',
+    what: 'Shows ~/Library in your home folder, where apps keep settings, caches and data.', pro: 'Handy when following support guides or checking what an app left behind.', con: 'Easier to change something an app depends on.',
+    on: 'Shown', off: 'Hidden', get: async () => { const o = await sh('/bin/ls', ['-ldO', require('node:os').homedir() + '/Library']).catch(() => ''); return o ? !/\bhidden\b/.test(o) : null; },
+    set: async v => sh('/usr/bin/chflags', [v ? 'nohidden' : 'hidden', require('node:os').homedir() + '/Library'])},
+  {id: 'saveLocal', group: 'explorer', title: 'Save new documents to this Mac', type: 'toggle', recommended: null, verdict: 'preference', restart: 'apps',
+    what: 'Save dialogs start in a folder on this Mac instead of iCloud Drive.', pro: 'Files don’t fill up iCloud storage or wait for upload.', con: 'New documents aren’t automatically on your other devices.',
+    on: 'This Mac', off: 'iCloud', get: async () => !bool(await read(G, 'NSDocumentSaveNewDocumentsToCloud'), true), set: async v => v ? write(G, 'NSDocumentSaveNewDocumentsToCloud', 'bool', 'false') : del(G, 'NSDocumentSaveNewDocumentsToCloud')},
+  {id: 'expandSave', group: 'explorer', title: 'Expanded save dialogs', type: 'toggle', recommended: null, verdict: 'preference', restart: 'apps',
+    what: 'Save dialogs open with the full folder browser instead of the small version.', pro: 'Pick a folder without an extra click.', con: 'Dialogs take more room.',
+    on: 'Expanded', off: 'Compact', get: bt(G, 'NSNavPanelExpandedStateForSaveMode', false),
+    set: async v => { for (const k of ['NSNavPanelExpandedStateForSaveMode', 'NSNavPanelExpandedStateForSaveMode2']) { if (v) await write(G, k, 'bool', 'true'); else await del(G, k); } }},
   {id: 'searchScope', group: 'explorer', title: 'Finder search looks in', type: 'choice', recommended: null, verdict: 'preference',
     what: 'Where Finder searches when you type in a window’s search field.', options: [{value: 'SCev', label: 'This Mac'}, {value: 'SCcf', label: 'Current folder'}],
     get: async () => (await read('com.apple.finder', 'FXDefaultSearchScope')) || 'SCev', set: async v => write('com.apple.finder', 'FXDefaultSearchScope', 'string', v)},
@@ -137,7 +159,7 @@ class MacTweaks {
     const defs = T.filter(t => groups.includes(t.group));
     const values = await mapLimit(defs, 6, t => t.get().catch(() => null));
     return {groups: GROUPS, items: defs.map((t, i) => ({id: t.id, group: t.group, title: t.title, type: t.type, what: t.what, pro: t.pro || null, con: t.con || null, on: t.on || null, off: t.off || null, options: t.options || null, recommended: t.recommended, verdict: t.verdict, admin: !!t.admin, restart: t.restart || null, value: values[i] ?? null, extra: null}))
-      .filter(t => !(t.id === 'lowPower' && t.value === null))};
+      .filter(t => !(['lowPower', 'powerNap'].includes(t.id) && t.value === null))};
   }
 
   async set({id, value}) {
@@ -180,7 +202,9 @@ class MacTweaks {
       const comm = m[3].trim();
       const bundle = (comm.match(/^(.*?\.app)\//) || [])[1];
       const name = bundle ? path.basename(bundle, '.app') : path.basename(comm);
-      const g = groups.get(name) || {name, count: 0, memory: 0, cpu: 0, path: bundle || comm, system: comm.startsWith('/System/') || comm.startsWith('/usr/') || !comm.startsWith('/')};
+      // Apple apps such as Safari and Mail live under /System but are ordinary apps the user can quit.
+      const system = bundle ? /\/(CoreServices|Library\/(Private)?Frameworks)\//.test(bundle) : comm.startsWith('/System/') || comm.startsWith('/usr/') || !comm.startsWith('/');
+      const g = groups.get(name) || {name, count: 0, memory: 0, cpu: 0, path: bundle || comm, system};
       g.count++; g.memory += Number(m[1]) * 1024; g.cpu += Number(m[2]);
       groups.set(name, g);
     }

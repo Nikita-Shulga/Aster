@@ -1,5 +1,5 @@
 'use strict';
-const {sh, sudo} = require('./sh.cjs');
+const {sh, sudo, osa} = require('./sh.cjs');
 
 const APPS = {activity: 'Activity Monitor', diskutil: 'Disk Utility', console: 'Console', sysinfo: 'System Information', terminal: 'Terminal', keychain: 'Keychain Access', timemachine: 'Time Machine', script: 'Script Editor'};
 const SETTINGS = {
@@ -13,6 +13,7 @@ const CATALOG = {
   actions: [
     {id: 'snapshot', icon: 'restore', tone: 'blue', title: 'Create a Time Machine snapshot', text: 'Saves a local snapshot of your Mac you can restore from if a change goes wrong.'},
     {id: 'thin', icon: 'drive', tone: 'green', title: 'Free space used by local snapshots', text: 'Removes Time Machine local snapshots, which can hold many gigabytes of “purgeable” space.'},
+    {id: 'purge', icon: 'gauge', tone: 'blue', title: 'Free up memory', text: 'Clears inactive memory and disk caches so a sluggish Mac gets room back for apps. Asks for your password.', admin: true},
     {id: 'dns', icon: 'network', tone: 'green', title: 'Flush DNS cache', text: 'Fixes sites that fail to load after network or DNS changes. Asks for your password.', admin: true},
     {id: 'reindex', icon: 'search', tone: '', title: 'Rebuild Spotlight index', text: 'Fixes Spotlight not finding files. Re-indexing runs in the background for a while.', admin: true},
     {id: 'lsreset', icon: 'apps', tone: '', title: 'Fix duplicate “Open With” entries', text: 'Rebuilds the Launch Services database that lists which apps open which files.'},
@@ -43,6 +44,11 @@ class MacTools {
       }
       case 'dns': await sudo('/usr/bin/dscacheutil -flushcache; /usr/bin/killall -HUP mDNSResponder'); this.store.log({kind: 'tool', title: 'Flushed DNS cache'}); return {ok: true, message: 'DNS cache flushed'};
       case 'reindex': await sudo('/usr/bin/mdutil -E /'); this.store.log({kind: 'tool', title: 'Started rebuilding the Spotlight index'}); return {ok: true, message: 'Spotlight is re-indexing in the background'};
+      case 'purge': await sudo('/usr/sbin/purge', {timeout: 120000}); this.store.log({kind: 'tool', title: 'Freed inactive memory'}); return {ok: true, message: 'Inactive memory freed'};
+      // Finder can empty the Trash without Full Disk Access (macOS asks once to allow Aster to control Finder).
+      case 'bin':
+        await osa('tell application "Finder" to empty trash', {timeout: 600000}).catch(e => { throw new Error(/-1743|not authori[sz]ed/i.test(e.message) ? 'Allow Aster to control Finder in System Settings → Privacy & Security → Automation.' : e.message); });
+        this.store.log({kind: 'clean', title: 'Emptied the Trash'}); return {ok: true, message: 'Trash emptied'};
       case 'lsreset':
         await sh('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', ['-kill', '-r', '-domain', 'local', '-domain', 'system', '-domain', 'user'], {timeout: 300000});
         this.store.log({kind: 'tool', title: 'Rebuilt the Launch Services database'}); return {ok: true, message: '“Open With” list rebuilt'};

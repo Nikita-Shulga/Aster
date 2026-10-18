@@ -20,6 +20,31 @@ function cpuLoad() {
   return total > 0 ? Math.max(0, Math.min(100, Math.round(100 * (1 - idle / total)))) : 0;
 }
 
+// os.freemem() on macOS counts only completely unused pages (often under 1% of RAM), because macOS
+// keeps file caches in memory. Use Activity Monitor's definition instead: app memory + wired + compressed.
+async function memory() {
+  const total = os.totalmem();
+  try {
+    const out = await sh('/usr/bin/vm_stat', [], {timeout: 3000});
+    const page = Number((/page size of (\d+)/.exec(out) || [])[1]) || 16384;
+    const n = k => Number((new RegExp(`${k}:\\s+(\\d+)`).exec(out) || [])[1]) || 0;
+    const used = (n('Anonymous pages') - n('Pages purgeable') + n('Pages wired down') + n('Pages occupied by compressor')) * page;
+    if (used > 0 && used <= total) return {total, free: total - used};
+  } catch {}
+  return {total, free: os.freemem()};
+}
+
+// Battery health for laptops: cycle count, condition and maximum capacity (System Settings → Battery → Battery Health).
+async function battery() {
+  try {
+    const out = await sh('/usr/sbin/ioreg', ['-rn', 'AppleSmartBattery'], {timeout: 5000});
+    if (!out.trim()) return null;
+    const n = k => { const m = new RegExp(`"${k}" = (\\d+)`).exec(out); return m ? Number(m[1]) : null; };
+    const design = n('DesignCapacity'), max = n('NominalChargeCapacity') ?? n('AppleRawMaxCapacity');
+    return {cycles: n('CycleCount'), health: design && max ? Math.min(100, Math.round(100 * max / design)) : null, charging: /"IsCharging" = Yes/.test(out)};
+  } catch { return null; }
+}
+
 function capacity(p) {
   try { const s = fs.statfsSync(p); return {total: s.blocks * s.bsize, free: s.bavail * s.bsize}; } catch { return null; }
 }
@@ -42,11 +67,12 @@ function volumes() {
 
 async function info({refresh = false} = {}) {
   if (!cached || refresh) {
-    const [version, build, hw, gpu] = await Promise.all([
+    const [version, build, hw, gpu, batt] = await Promise.all([
       sh('/usr/bin/sw_vers', ['-productVersion']).then(s => s.trim()).catch(() => os.release()),
       sh('/usr/bin/sw_vers', ['-buildVersion']).then(s => s.trim()).catch(() => ''),
       sh('/usr/sbin/system_profiler', ['SPHardwareDataType', '-json'], {timeout: 20000}).then(s => JSON.parse(s).SPHardwareDataType?.[0] || {}).catch(() => ({})),
-      sh('/usr/sbin/system_profiler', ['SPDisplaysDataType', '-json'], {timeout: 20000}).then(s => (JSON.parse(s).SPDisplaysDataType || []).map(g => g.sppci_model || g._name).filter(Boolean)).catch(() => [])
+      sh('/usr/sbin/system_profiler', ['SPDisplaysDataType', '-json'], {timeout: 20000}).then(s => (JSON.parse(s).SPDisplaysDataType || []).map(g => g.sppci_model || g._name).filter(Boolean)).catch(() => []),
+      battery()
     ]);
     const major = parseInt(version, 10);
     cached = {
@@ -60,14 +86,15 @@ async function info({refresh = false} = {}) {
       cpu: hw.chip_type || os.cpus()[0]?.model?.trim() || 'Unknown CPU',
       cores: os.cpus().length,
       gpu,
+      battery: batt,
       admin: false,
       mac: true,
       drives: volumes()
     };
   }
-  return {...cached, drives: volumes(), fda: hasFullDiskAccess(), memory: {total: os.totalmem(), free: os.freemem()}, uptime: os.uptime(), cpuLoad: cpuLoad()};
+  return {...cached, drives: volumes(), fda: hasFullDiskAccess(), memory: await memory(), uptime: os.uptime(), cpuLoad: cpuLoad()};
 }
 
-function live() { return {memory: {total: os.totalmem(), free: os.freemem()}, cpuLoad: cpuLoad(), uptime: os.uptime()}; }
+async function live() { return {memory: await memory(), cpuLoad: cpuLoad(), uptime: os.uptime()}; }
 
-module.exports = {info, live, volumes};
+module.exports = {info, live, volumes, memory, battery};

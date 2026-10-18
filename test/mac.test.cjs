@@ -17,6 +17,11 @@ test('system info describes the Mac and its volumes', async () => {
   assert.ok(s.cpu && s.cores > 0 && s.memory.total > 0);
   assert.ok(s.drives.some(d => d.root === '/' && d.total > 0 && d.free >= 0), JSON.stringify(s.drives));
   assert.ok([true, false].includes(s.fda));
+  // Memory "used" must match Activity Monitor (app + wired + compressed), not os.freemem(), which is near zero on a busy Mac.
+  const used = s.memory.total - s.memory.free;
+  assert.ok(s.memory.free > os.freemem() || s.memory.free >= s.memory.total * 0.02, JSON.stringify(s.memory));
+  assert.ok(used > 0 && used < s.memory.total, JSON.stringify(s.memory));
+  if (s.battery) assert.ok(s.battery.health > 0 && s.battery.health <= 100 && s.battery.cycles >= 0, JSON.stringify(s.battery));
 });
 
 test('cleaner rules are complete and analyze without errors', async () => {
@@ -54,6 +59,29 @@ test('temporary files: only old files are removed, links are not followed', asyn
   } finally { process.env.TMPDIR = prev; }
 });
 
+test('cleaner: single files and single locations can be cleaned on their own', async () => {
+  const tmp = path.join(fixture, 'T2');
+  fs.mkdirSync(path.join(tmp, 'a'), {recursive: true}); fs.mkdirSync(path.join(tmp, 'b'), {recursive: true});
+  const old = p => { fs.writeFileSync(p, 'x'.repeat(500)); const t = Date.now() / 1000 - 200 * 3600; fs.utimesSync(p, t, t); };
+  old(path.join(tmp, 'a', 'one.tmp')); old(path.join(tmp, 'a', 'two.tmp')); old(path.join(tmp, 'b', 'three.tmp'));
+  const secret = path.join(fixture, 'secret.txt'); old(secret);
+  const prev = process.env.TMPDIR; process.env.TMPDIR = tmp;
+  const trashed = [];
+  try {
+    const {Cleaner} = require('../src/main/cleaner.cjs');
+    const c = new Cleaner({getSettings: () => ({exclusions: []}), getDrives: async () => [], trash: async p => { trashed.push(p); fs.rmSync(p); }});
+    // One file goes to the Trash; a path outside the item is refused.
+    const r = await c.removeFiles({id: 'macos.temp', paths: [path.join(tmp, 'a', 'one.tmp'), secret, path.join(tmp, 'a', '..', '..', 'secret.txt')]});
+    assert.deepStrictEqual(r.done, [path.join(tmp, 'a', 'one.tmp')]);
+    assert.strictEqual(r.failed.length, 2);
+    assert.ok(fs.existsSync(secret));
+    // Per-app cache locations: only the chosen folder is cleaned.
+    const {allRules} = require('../src/main/mac/cleaner-rules.cjs');
+    const caches = allRules().find(x => x.id === 'macos.appcaches').resolve();
+    assert.ok(caches.length > 1 && caches.every(t => t.dir.startsWith(path.join(os.homedir(), 'Library', 'Caches'))));
+  } finally { process.env.TMPDIR = prev; }
+});
+
 test('programs: lists app bundles with identifiers and finds leftovers', async () => {
   const {MacPrograms} = require('../src/main/mac/programs.cjs');
   const p = new MacPrograms({store, getIcon: async () => null, trash: async () => {}});
@@ -80,6 +108,8 @@ test('leftovers: scan returns well-formed items and never flags Apple data', asy
   for (const i of r.items) {
     assert.ok(i.id && i.path.startsWith(os.homedir()) && i.title && i.type);
     assert.ok(!/com\.apple\./i.test(path.basename(i.path)), i.path);
+    // Folders named after macOS daemons (contactsd, tipsd, Animoji…) belong to macOS.
+    assert.ok(!/^(contactsd|tipsd|identityservicesd|animoji|askpermission|differentialprivacy|diskimages|sesstorage|assistant|baseband|sync)$/i.test(path.basename(i.path)), i.path);
   }
 });
 
@@ -97,6 +127,11 @@ test('tweaks: every value can be read; a Finder setting round-trips', async () =
   assert.strictEqual(await read(), before);
   const power = await tw.power();
   assert.ok(Array.isArray(power.plans));
+  for (const id of ['foldersFirst', 'expandSave']) {
+    const v = (await tw.list({groups: ['explorer']})).items.find(i => i.id === id).value;
+    try { await tw.set({id, value: !v}); assert.strictEqual((await tw.list({groups: ['explorer']})).items.find(i => i.id === id).value, !v, id); }
+    finally { await tw.set({id, value: v}); }
+  }
   const procs = await tw.processes();
   assert.ok(procs.items.length > 0 && procs.items.every(p => p.name && p.memory >= 0));
 });
@@ -122,6 +157,14 @@ test('display list never throws', async () => {
   const {MacDisplay} = require('../src/main/mac/display.cjs');
   const r = await new MacDisplay({store}).list();
   assert.ok(Array.isArray(r.items));
+  for (const d of r.items) if (d.pixels && d.width && +d.pixels.split(' ')[0] > d.width) assert.ok(d.retina, JSON.stringify(d));
+});
+
+test('tools: Mac catalog actions are all implemented', async () => {
+  const {MacTools} = require('../src/main/mac/tools.cjs');
+  const t = new MacTools({store, shell: {}});
+  const src = fs.readFileSync(require.resolve('../src/main/mac/tools.cjs'), 'utf8');
+  for (const a of t.catalog().actions) assert.ok(src.includes(`case '${a.id}'`), a.id);
 });
 
 test.after(() => fs.rmSync(fixture, {recursive: true, force: true}));
