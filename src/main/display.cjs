@@ -1,6 +1,7 @@
 'use strict';
 // Monitor resolution and refresh rate through the Win32 display-settings API.
 const {psJson, arr} = require('./ps.cjs');
+const {td} = require('./i18n.cjs');
 
 const NATIVE = String.raw`
 if (-not ('AsterDisplay' -as [type])) {
@@ -75,15 +76,20 @@ Out-Json ([pscustomobject]@{ result = $r })
 class Display {
   constructor({store}) { this.store = store; }
   async list() {
-    const items = arr(await psJson(LIST, null, {timeout: 40000})).map(d => ({...d, modes: arr(d.modes).sort((a, b) => b.w * b.h - a.w * a.h || b.f - a.f)}));
+    // Monitors without a reported name are called "Display 1", "Display 2"… by the script.
+    const name = n => { const m = /^Display (\d+)$/.exec(n || ''); return m ? td('Display {n}', {n: m[1]}) : n; };
+    const items = arr(await psJson(LIST, null, {timeout: 40000})).map(d => ({...d, name: name(d.name), modes: arr(d.modes).sort((a, b) => b.w * b.h - a.w * a.h || b.f - a.f)}));
     return {items};
   }
   async set({device, width, height, freq}) {
     if (typeof device !== 'string' || !/^\\\\\.\\DISPLAY\d+$/i.test(device)) throw new Error('Invalid display');
     const [w, h, f] = [width, height, freq].map(Number);
     if (![w, h, f].every(n => Number.isInteger(n) && n > 0 && n < 20000)) throw new Error('Invalid display mode');
-    const r = await psJson(SET, {device, width: w, height: h, freq: f}, {timeout: 30000});
-    this.store.log({kind: 'tweak', title: `Display set to ${w}×${h} at ${f} Hz`});
+    const r = await psJson(SET, {device, width: w, height: h, freq: f}, {timeout: 30000}).catch(e => {
+      const m = /^This display mode is not supported \(code (-?\d+)\)\.$/.exec(e?.message || '');
+      throw m ? new Error(td('This display mode is not supported (code {code}).', {code: m[1]})) : e;
+    });
+    this.store.log({kind: 'tweak', key: 'activity.display', vars: {w: String(w), h: String(h), f: String(f)}});
     return {ok: true, restartNeeded: r?.result === 1};
   }
 }

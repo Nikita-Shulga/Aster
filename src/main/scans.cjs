@@ -6,6 +6,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const {promisify} = require('node:util');
+const {t} = require('./i18n.cjs');
 
 const gzip = promisify(zlib.gzip), gunzip = promisify(zlib.gunzip);
 const KINDS = new Set(['disk', 'duplicates', 'cleaner']);
@@ -16,7 +17,7 @@ class ScanCache {
   constructor(root) { this.dir = path.join(root, 'scans'); this.queue = new Map(); }
 
   file(kind) {
-    if (!KINDS.has(kind)) throw new Error('Unknown scan');
+    if (!KINDS.has(kind)) throw new Error(t('main.unknownScan'));
     return path.join(this.dir, `${kind}.json.gz`);
   }
 

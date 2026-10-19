@@ -7,6 +7,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {sh, osa, sudo, q, asString, plist, mapLimit, LIB, uid, volumeOf} = require('./sh.cjs');
+const {td} = require('../i18n.cjs');
 
 const DIRS = [
   {dir: path.join(LIB, 'LaunchAgents'), type: 'agent', scope: 'user', source: 'Launch agent · Only me'},
@@ -67,7 +68,8 @@ class MacStartup {
       this.items.set(id, item);
       return item;
     });
-    return {items, loginItemsUnavailable: logins === null};
+    // "source" stays English in the cached items and is shown in the interface language.
+    return {items: items.map(i => ({...i, source: td(i.source)})), loginItemsUnavailable: logins === null};
   }
 
   async icons({ids}) {
@@ -89,7 +91,7 @@ class MacStartup {
       else await sh('/bin/launchctl', ['bootout', `${domain}/${it.label}`]).catch(() => {});
     }
     it.enabled = !!enabled;
-    this.store.log({kind: 'startup', title: `${enabled ? 'Enabled' : 'Disabled'} ${it.name} at startup`});
+    this.store.log({kind: 'startup', key: enabled ? 'activity.startupEnabled' : 'activity.startupDisabled', vars: {name: it.name}});
     return {ok: true};
   }
 
@@ -104,7 +106,7 @@ class MacStartup {
       catch { await osa(`tell application "Finder" to delete POSIX file ${asString(it.location)}`, {timeout: 120000}); }
     }
     this.items.delete(id);
-    this.store.log({kind: 'startup', title: `Removed ${it.name} from startup`});
+    this.store.log({kind: 'startup', key: 'activity.startupRemoved', vars: {name: it.name}});
     return {ok: true, backup: null};
   }
 
@@ -112,7 +114,7 @@ class MacStartup {
     const appPath = String(command || '').replace(/^"|"$/g, '');
     if (!appPath.startsWith('/')) throw new Error('Choose an app.');
     await osa(`tell application "System Events" to make login item at end with properties {path:${asString(appPath)}, hidden:false}`, {timeout: 20000});
-    this.store.log({kind: 'startup', title: `Added ${path.basename(appPath, '.app')} to login items`});
+    this.store.log({kind: 'startup', key: 'activity.loginItemAdded', vars: {name: path.basename(appPath, '.app')}});
     return {ok: true};
   }
 

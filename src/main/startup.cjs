@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {psJson, arr} = require('./ps.cjs');
 const S = require('./registry-ps.cjs');
+const {td} = require('./i18n.cjs');
 
 // Windows itself (Task Manager, Settings) stores the enabled state of Run entries and
 // startup-folder shortcuts in Explorer\StartupApproved. Aster uses the same mechanism.
@@ -144,7 +145,8 @@ class Startup {
       this.items.set(id, item);
       return item;
     });
-    return {items};
+    // "Registry · Current user", "Service · Auto"…: the source label is translated on the way out.
+    return {items: items.map(i => ({...i, source: td(i.source)}))};
   }
 
   async icons({ids}) {
@@ -165,7 +167,7 @@ class Startup {
       else if (it.type === 'service') await psJson(SERVICE, {name: it.serviceName, mode: enabled ? 'Automatic' : 'Manual'});
     } catch (e) { throw accessHint(e); }
     it.enabled = !!enabled;
-    this.store.log({kind: 'startup', title: `${enabled ? 'Enabled' : 'Disabled'} ${it.name} at startup`});
+    this.store.log({kind: 'startup', key: enabled ? 'activity.startupEnabled' : 'activity.startupDisabled', vars: {name: it.name}});
     return {ok: true};
   }
 
@@ -187,7 +189,7 @@ class Startup {
       } else throw new Error('Services can be switched to manual start but not deleted.');
     } catch (e) { throw accessHint(e); }
     this.items.delete(id);
-    this.store.log({kind: 'startup', title: `Removed ${it.name} from startup`, backup});
+    this.store.log({kind: 'startup', key: 'activity.startupRemoved', vars: {name: it.name}, backup});
     return {ok: true, backup};
   }
 
@@ -195,7 +197,7 @@ class Startup {
     if (typeof name !== 'string' || !name.trim() || name.length > 200) throw new Error('Enter a name for the entry.');
     if (typeof command !== 'string' || !command.trim()) throw new Error('Choose a program.');
     await psJson(ADD, {name: name.trim(), command: command.trim()});
-    this.store.log({kind: 'startup', title: `Added ${name.trim()} to startup`});
+    this.store.log({kind: 'startup', key: 'activity.startupAdded', vars: {name: name.trim()}});
     return {ok: true};
   }
 

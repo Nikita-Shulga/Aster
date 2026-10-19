@@ -1,6 +1,7 @@
 'use strict';
 const os = require('node:os');
 const {psJson, arr} = require('./ps.cjs');
+const {td} = require('./i18n.cjs');
 
 const SCRIPT = String.raw`
 $cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
@@ -26,9 +27,9 @@ function cpuLoad() {
   let idle = 0, total = 0;
   now.forEach((c, i) => {
     const p = lastCpu[i] || c;
-    const t = k => c.times[k] - p.times[k];
-    const sum = t('user') + t('nice') + t('sys') + t('idle') + t('irq');
-    idle += t('idle'); total += sum;
+    const delta = k => c.times[k] - p.times[k];
+    const sum = delta('user') + delta('nice') + delta('sys') + delta('idle') + delta('irq');
+    idle += delta('idle'); total += sum;
   });
   lastCpu = now;
   return total > 0 ? Math.max(0, Math.min(100, Math.round(100 * (1 - idle / total)))) : 0;
@@ -43,13 +44,14 @@ async function info({refresh = false} = {}) {
     if (build >= 22000) product = product.replace('Windows 10', 'Windows 11');
     cached = {
       os: product,
-      osVersion: data?.display ? `${data.display} (build ${data.build}${data.ubr ? '.' + data.ubr : ''})` : os.release(),
+      // "24H2 (build 26100.4061)": the word "build" is added in the current language by info().
+      osVersion: data?.display ? {version: data.display, build: `${data.build}${data.ubr ? '.' + data.ubr : ''}`} : os.release(),
       build,
       arch: os.arch(),
       hostname: os.hostname(),
       user: os.userInfo().username,
       model: data?.model || null,
-      cpu: os.cpus()[0]?.model?.trim() || 'Unknown CPU',
+      cpu: os.cpus()[0]?.model?.trim() || null,
       cores: os.cpus().length,
       gpu: arr(data?.gpu).filter(Boolean),
       admin: data?.admin === true,
@@ -57,7 +59,8 @@ async function info({refresh = false} = {}) {
       drives: arr(data?.drives).filter(d => d.total >= 2 * 1024 ** 3)
     };
   }
-  return {...cached, memory: {total: os.totalmem(), free: os.freemem()}, uptime: os.uptime(), cpuLoad: cpuLoad()};
+  const {osVersion, cpu} = cached;
+  return {...cached, osVersion: typeof osVersion === 'string' ? osVersion : td('{version} (build {build})', osVersion), cpu: cpu || td('Unknown CPU'), memory: {total: os.totalmem(), free: os.freemem()}, uptime: os.uptime(), cpuLoad: cpuLoad()};
 }
 
 function live() {

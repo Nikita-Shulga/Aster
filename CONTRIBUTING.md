@@ -38,6 +38,8 @@ npm test           # tests for the platform you're on
 
 **Explain before you change.** Every cleaner rule, registry category, tweak and file classification must say, in plain language, what it is, what the user loses and whether it's safe (`contains` / `ifDeleted` / `advice` / `verdict`). If you can't explain it, don't add it.
 
+**Say it in both languages.** Aster's interface is English and Russian. Interface text lives in `src/renderer/js/locales/en.js` / `ru.js` and `src/main/locales/en.cjs` / `ru.cjs` (same keys in both); explanations written next to rules, registry categories, tweaks and file types stay in English in place and get their Russian in `src/main/locales/ru-data/`. `npm test` fails when a translation is missing — if you don't speak Russian, say so in the PR and we'll add it.
+
 **Keep it undoable.** User files go to the Recycle Bin / Trash, registry changes are exported to a `.reg` backup first, settings show a before → after preview. Only regenerable caches may be deleted permanently. Never follow links or junctions while cleaning, never clean shallow paths, never touch Apple's files or protected Windows registry roots.
 
 **Pre-select only what is safe.** Anything that signs people out, loses tabs, empties the Recycle Bin or could hold documents must be off by default and clearly marked.

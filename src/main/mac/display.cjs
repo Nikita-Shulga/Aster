@@ -2,6 +2,7 @@
 // macOS does not offer a public way for apps to change resolution or refresh rate,
 // so displays are shown read-only with a shortcut to System Settings → Displays.
 const {sh} = require('./sh.cjs');
+const {td} = require('../i18n.cjs');
 
 class MacDisplay {
   constructor({store}) { this.store = store; }
@@ -14,7 +15,7 @@ class MacDisplay {
       const px = String(d._spdisplays_pixels || '').match(/(\d+)\s*x\s*(\d+)/);
       const m = res.match(/(\d+)\s*x\s*(\d+)(?:.*?@\s*([\d.]+)\s*Hz)?/i);
       items.push({
-        device: d._name || 'Display', name: d._name || 'Display', primary: d.spdisplays_main === 'spdisplays_yes',
+        device: d._name || 'Display', name: d._name || td('Display'), primary: d.spdisplays_main === 'spdisplays_yes',
         width: m ? +m[1] : null, height: m ? +m[2] : null, freq: m?.[3] ? Math.round(+m[3]) : null,
         pixels: px ? `${px[1]} × ${px[2]}` : null, // Retina panels render at a lower "looks like" resolution than their physical pixels.
         retina: /retina/i.test(res) || d.spdisplays_pixelresolution === 'spdisplays_retina' || !!(px && m && +px[1] > +m[1]),

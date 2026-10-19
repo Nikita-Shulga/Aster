@@ -1,42 +1,52 @@
 // Sample data used only when the UI runs outside Electron (browser preview / screenshots).
+// Like the main process, the sample API answers in the interface language: descriptive text is written as
+// L(english, russian) and turned into the current language's text when a method is called (or an event is sent).
+// Names that are data — programs, publishers, paths, hardware, OS products — are written once, as the system gives them.
+import {lang} from './i18n.js';
+
 const MAC = new URLSearchParams(location.search).get('platform') === 'darwin';
+const TR = Symbol('text');
+const L = (en, ru) => ({[TR]: true, en, ru});
+const tx = v => v?.[TR] ? v[lang()] ?? v.en : v;
+const loc = v => v?.[TR] ? tx(v) : Array.isArray(v) ? v.map(loc) : v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, loc(x)])) : v;
 const listeners = new Set();
-const emit = e => listeners.forEach(fn => fn(e));
+const emit = e => { const v = loc(e); listeners.forEach(fn => fn(v)); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const GB = 1024 ** 3, MB = 1024 ** 2;
 
-let settings = {theme: 'system', closeAppsBeforeCleaning: false, confirmBeforeCleaning: true, exclusions: [], cleanerSelection: null, registryCategories: null};
+let settings = {language: 'en', theme: 'system', closeAppsBeforeCleaning: false, confirmBeforeCleaning: true, exclusions: [], cleanerSelection: null, registryCategories: null};
 const activity = [
-  {id: 'a1', at: new Date(Date.now() - 864e5 * 2).toISOString(), kind: 'clean', title: 'Cleaned 18,204 files', bytes: 3.1 * GB},
-  {id: 'a2', at: new Date(Date.now() - 864e5 * 2).toISOString(), kind: 'registry', title: 'Fixed 212 registry issues', count: 212, backup: 'x.reg', backupExists: true},
-  {id: 'a3', at: new Date(Date.now() - 864e5 * 5).toISOString(), kind: 'uninstall', title: 'Uninstalled Old Toolbar'},
-  {id: 'a4', at: new Date(Date.now() - 864e5 * 5).toISOString(), kind: 'startup', title: 'Disabled Spotify at startup'}
+  {id: 'a1', at: new Date(Date.now() - 864e5 * 2).toISOString(), kind: 'clean', title: L('Cleaned 18,204 files', 'Удалено 18\u00a0204 ненужных файла'), bytes: 3.1 * GB},
+  {id: 'a2', at: new Date(Date.now() - 864e5 * 2).toISOString(), kind: 'registry', title: L('Fixed 212 registry issues', 'Исправлено 212 проблем в реестре'), count: 212, backup: 'x.reg', backupExists: true},
+  {id: 'a3', at: new Date(Date.now() - 864e5 * 5).toISOString(), kind: 'uninstall', title: L('Uninstalled Old Toolbar', 'Удалена программа Old Toolbar')},
+  {id: 'a4', at: new Date(Date.now() - 864e5 * 5).toISOString(), kind: 'startup', title: L('Disabled Spotify at startup', 'Отключена автозагрузка: Spotify')}
 ];
 
-const R = (id, group, app, appId, name, description, bytes, extra = {}) => ({id, group, app, appId, name, description, defaultOn: true, admin: false, privacy: false, caution: false, processes: [], installed: true, bytes, verdict: extra.caution ? 'keep' : extra.privacy || extra.defaultOn === false ? 'review' : 'safe', contains: description + ' It does not contain passwords, bookmarks or logins.', ifDeleted: 'Rebuilt automatically; things may load slightly slower the first time.', advice: 'Safe to clean anytime.', ...extra});
+const R = (id, group, app, appId, name, description, bytes, extra = {}) => ({id, group, app, appId, name, description, defaultOn: true, admin: false, privacy: false, caution: false, processes: [], installed: true, bytes, verdict: extra.caution ? 'keep' : extra.privacy || extra.defaultOn === false ? 'review' : 'safe', contains: L(description.en + ' It does not contain passwords, bookmarks or logins.', description.ru + ' Пароли, закладки и данные для входа здесь не хранятся.'), ifDeleted: L('Rebuilt automatically; things may load slightly slower the first time.', 'Создаётся заново автоматически; в первый раз всё может загружаться чуть медленнее.'), advice: L('Safe to clean anytime.', 'Можно очищать в любое время.'), ...extra});
+const CACHE = L('Cache', 'Кэш'), WEB_CACHE = L('Cached web content.', 'Кэшированное содержимое веб-страниц.');
 const rules = [
-  R('windows.temp', 'windows', 'Windows', 'windows', 'Temporary files', 'Files apps left in your temp folder.', 2.4 * GB),
-  R('windows.systemp', 'windows', 'Windows', 'windows', 'System temporary files', 'Windows temp folder.', 820 * MB, {admin: true}),
-  R('windows.recyclebin', 'windows', 'Windows', 'windows', 'Recycle Bin', 'Permanently removes everything in the Recycle Bin.', 1.3 * GB),
-  R('windows.thumbcache', 'windows', 'Windows', 'windows', 'Thumbnail cache', 'Explorer thumbnail caches.', 214 * MB),
-  R('windows.wer', 'windows', 'Windows', 'windows', 'Error reports', 'Crash reports.', 96 * MB),
-  R('windows.dumps', 'windows', 'Windows', 'windows', 'Crash dumps', 'Memory dumps.', 640 * MB),
-  R('windows.shadercache', 'windows', 'Windows', 'windows', 'Graphics shader cache', 'Shader caches.', 1.1 * GB),
-  R('windows.updatecache', 'windows', 'Windows', 'windows', 'Windows Update downloads', 'Installed update packages.', 3.6 * GB, {admin: true}),
-  R('windows.recent', 'windows', 'Windows', 'windows', 'Recent files list', 'Quick Access recent items.', 1 * MB, {defaultOn: false, privacy: true}),
-  R('chrome.cache', 'browsers', 'Google Chrome', 'chrome', 'Cache', 'Cached images and scripts.', 1.8 * GB, {processes: ['chrome.exe']}),
-  R('chrome.history', 'browsers', 'Google Chrome', 'chrome', 'Browsing history', 'Visited sites.', 64 * MB, {defaultOn: false, privacy: true}),
-  R('chrome.cookies', 'browsers', 'Google Chrome', 'chrome', 'Cookies', 'Signs you out of websites.', 12 * MB, {defaultOn: false, privacy: true, caution: true}),
-  R('edge.cache', 'browsers', 'Microsoft Edge', 'edge', 'Cache', 'Cached web content.', 690 * MB),
-  R('firefox.cache', 'browsers', 'Mozilla Firefox', 'firefox', 'Cache', 'Cached web content.', 410 * MB),
-  R('apps.discord', 'apps', 'Discord', 'discord', 'Cache', 'Cached data the app rebuilds.', 520 * MB, {processes: ['discord.exe']}),
-  R('apps.spotify', 'apps', 'Spotify', 'spotify', 'Cache', 'Streamed music cache.', 2.2 * GB),
-  R('apps.vscode', 'apps', 'Visual Studio Code', 'vscode', 'Cache', 'Editor caches and logs.', 380 * MB),
-  R('apps.npm', 'apps', 'npm', 'npm', 'Cache', 'Downloaded package cache.', 1.6 * GB, {defaultOn: false})
+  R('windows.temp', 'windows', 'Windows', 'windows', L('Temporary files', 'Временные файлы'), L('Files apps left in your temp folder.', 'Файлы, которые программы оставили в папке временных файлов.'), 2.4 * GB),
+  R('windows.systemp', 'windows', 'Windows', 'windows', L('System temporary files', 'Системные временные файлы'), L('Windows temp folder.', 'Папка временных файлов Windows.'), 820 * MB, {admin: true}),
+  R('windows.recyclebin', 'windows', 'Windows', 'windows', L('Recycle Bin', 'Корзина'), L('Permanently removes everything in the Recycle Bin.', 'Безвозвратно удаляет всё содержимое Корзины.'), 1.3 * GB),
+  R('windows.thumbcache', 'windows', 'Windows', 'windows', L('Thumbnail cache', 'Кэш эскизов'), L('Explorer thumbnail caches.', 'Кэш эскизов Проводника.'), 214 * MB),
+  R('windows.wer', 'windows', 'Windows', 'windows', L('Error reports', 'Отчёты об ошибках'), L('Crash reports.', 'Отчёты о сбоях.'), 96 * MB),
+  R('windows.dumps', 'windows', 'Windows', 'windows', L('Crash dumps', 'Аварийные дампы'), L('Memory dumps.', 'Дампы памяти.'), 640 * MB),
+  R('windows.shadercache', 'windows', 'Windows', 'windows', L('Graphics shader cache', 'Кэш графических шейдеров'), L('Shader caches.', 'Кэши шейдеров.'), 1.1 * GB),
+  R('windows.updatecache', 'windows', 'Windows', 'windows', L('Windows Update downloads', 'Загрузки Центра обновления Windows'), L('Installed update packages.', 'Пакеты уже установленных обновлений.'), 3.6 * GB, {admin: true}),
+  R('windows.recent', 'windows', 'Windows', 'windows', L('Recent files list', 'Список последних файлов'), L('Quick Access recent items.', 'Последние файлы на панели быстрого доступа.'), 1 * MB, {defaultOn: false, privacy: true}),
+  R('chrome.cache', 'browsers', 'Google Chrome', 'chrome', CACHE, L('Cached images and scripts.', 'Кэшированные изображения и скрипты.'), 1.8 * GB, {processes: ['chrome.exe']}),
+  R('chrome.history', 'browsers', 'Google Chrome', 'chrome', L('Browsing history', 'История посещений'), L('Visited sites.', 'Посещённые сайты.'), 64 * MB, {defaultOn: false, privacy: true}),
+  R('chrome.cookies', 'browsers', 'Google Chrome', 'chrome', L('Cookies', 'Файлы cookie'), L('Signs you out of websites.', 'Вы выйдете из аккаунтов на сайтах.'), 12 * MB, {defaultOn: false, privacy: true, caution: true}),
+  R('edge.cache', 'browsers', 'Microsoft Edge', 'edge', CACHE, WEB_CACHE, 690 * MB),
+  R('firefox.cache', 'browsers', 'Mozilla Firefox', 'firefox', CACHE, WEB_CACHE, 410 * MB),
+  R('apps.discord', 'apps', 'Discord', 'discord', CACHE, L('Cached data the app rebuilds.', 'Кэшированные данные, которые приложение создаст заново.'), 520 * MB, {processes: ['discord.exe']}),
+  R('apps.spotify', 'apps', 'Spotify', 'spotify', CACHE, L('Streamed music cache.', 'Кэш прослушанной музыки.'), 2.2 * GB),
+  R('apps.vscode', 'apps', 'Visual Studio Code', 'vscode', CACHE, L('Editor caches and logs.', 'Кэши и журналы редактора.'), 380 * MB),
+  R('apps.npm', 'apps', 'npm', 'npm', CACHE, L('Downloaded package cache.', 'Кэш скачанных пакетов.'), 1.6 * GB, {defaultOn: false})
 ];
 
 const cats = ['uninstall', 'startup', 'apppaths', 'shareddlls', 'applications', 'extensions', 'com', 'muicache', 'compat', 'installer', 'fonts', 'help', 'empty'];
-const catNames = {uninstall: 'Broken uninstall entries', startup: 'Invalid startup entries', apppaths: 'Invalid application paths', shareddlls: 'Missing shared DLLs', applications: 'Obsolete "Open with" apps', extensions: 'Unused file extensions', com: 'Broken COM registrations', muicache: 'MUI cache', compat: 'Compatibility records', installer: 'Installer folders', fonts: 'Missing fonts', help: 'Missing help files', empty: 'Empty software keys'};
+const catNames = {uninstall: L('Broken uninstall entries', 'Неисправные записи в списке программ'), startup: L('Invalid startup entries', 'Неверные записи автозагрузки'), apppaths: L('Invalid application paths', 'Неверные пути к приложениям'), shareddlls: L('Missing shared DLLs', 'Отсутствующие общие DLL'), applications: L('Obsolete "Open with" apps', 'Устаревшие приложения в меню «Открыть с помощью»'), extensions: L('Unused file extensions', 'Неиспользуемые расширения файлов'), com: L('Broken COM registrations', 'Повреждённые регистрации COM'), muicache: L('MUI cache', 'Кэш MUI'), compat: L('Compatibility records', 'Записи совместимости'), installer: L('Installer folders', 'Папки установщика'), fonts: L('Missing fonts', 'Отсутствующие шрифты'), help: L('Missing help files', 'Отсутствующие файлы справки'), empty: L('Empty software keys', 'Пустые разделы программ')};
 const issues = [];
 const sample = {uninstall: 2, startup: 1, shareddlls: 12, muicache: 48, compat: 31, installer: 14, empty: 9, extensions: 4};
 for (const [type, n] of Object.entries(sample)) for (let i = 0; i < n; i++) issues.push({id: `${type}${i}`, type, path: type === 'muicache' ? 'HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache' : type === 'uninstall' ? `HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\App${i}` : 'HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Store', value: type === 'uninstall' ? null : `C:\\Users\\Alex\\Downloads\\setup_${i}.exe`, action: 'deleteValue', title: type === 'uninstall' ? ['Old Game Launcher', 'PDF Toolbar'][i] : `setup_${i}.exe`, target: `C:\\Users\\Alex\\Downloads\\setup_${i}.exe`, admin: type === 'uninstall' || type === 'shareddlls' || type === 'installer', risk: type === 'uninstall' ? 'medium' : 'low'});
@@ -54,16 +64,17 @@ const programs = [
 ];
 
 const S = (name, publisher, command, type, source, enabled, extra = {}) => ({id: name.replace(/\W/g, ''), name, publisher, command, type, source, enabled, canToggle: true, exists: true, file: command, scope: 'user', ...extra});
+const REG_USER = L('Registry · Current user', 'Реестр · Текущий пользователь');
 const startup = [
-  S('Discord', 'Discord Inc.', 'C:\\Users\\Alex\\AppData\\Local\\Discord\\Update.exe --processStart Discord.exe', 'registry', 'Registry · Current user', true),
-  S('Spotify', 'Spotify AB', 'C:\\Users\\Alex\\AppData\\Roaming\\Spotify\\Spotify.exe /minimized', 'registry', 'Registry · Current user', false),
-  S('Steam', 'Valve Corporation', '"C:\\Program Files (x86)\\Steam\\steam.exe" -silent', 'registry', 'Registry · Current user', true),
-  S('OneDrive', 'Microsoft Corporation', '"C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe" /background', 'registry', 'Registry · Current user', true),
-  S('SecurityHealth', 'Microsoft Corporation', '%windir%\\system32\\SecurityHealthSystray.exe', 'registry', 'Registry · All users', true, {scope: 'machine', admin: true}),
-  S('Old Updater', null, 'C:\\Program Files\\OldApp\\updater.exe', 'registry', 'Registry · Current user', true, {exists: false}),
-  S('Notion', 'Notion Labs', 'C:\\Users\\Alex\\AppData\\Local\\Programs\\Notion\\Notion.exe', 'folder', 'Startup folder · Current user', true),
-  S('GoogleUpdateTaskMachineUA', 'Google LLC', '"C:\\Program Files (x86)\\Google\\Update\\GoogleUpdate.exe" /ua', 'task', 'Scheduled task · At sign-in', true),
-  S('Adobe Update Service', 'Adobe Inc.', '"C:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\armsvc.exe"', 'service', 'Service · Auto', true, {state: 'Running', admin: true, scope: 'machine'})
+  S('Discord', 'Discord Inc.', 'C:\\Users\\Alex\\AppData\\Local\\Discord\\Update.exe --processStart Discord.exe', 'registry', REG_USER, true),
+  S('Spotify', 'Spotify AB', 'C:\\Users\\Alex\\AppData\\Roaming\\Spotify\\Spotify.exe /minimized', 'registry', REG_USER, false),
+  S('Steam', 'Valve Corporation', '"C:\\Program Files (x86)\\Steam\\steam.exe" -silent', 'registry', REG_USER, true),
+  S('OneDrive', 'Microsoft Corporation', '"C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe" /background', 'registry', REG_USER, true),
+  S('SecurityHealth', 'Microsoft Corporation', '%windir%\\system32\\SecurityHealthSystray.exe', 'registry', L('Registry · All users', 'Реестр · Все пользователи'), true, {scope: 'machine', admin: true}),
+  S('Old Updater', null, 'C:\\Program Files\\OldApp\\updater.exe', 'registry', REG_USER, true, {exists: false}),
+  S('Notion', 'Notion Labs', 'C:\\Users\\Alex\\AppData\\Local\\Programs\\Notion\\Notion.exe', 'folder', L('Startup folder · Current user', 'Папка автозагрузки · Текущий пользователь'), true),
+  S('GoogleUpdateTaskMachineUA', 'Google LLC', '"C:\\Program Files (x86)\\Google\\Update\\GoogleUpdate.exe" /ua', 'task', L('Scheduled task · At sign-in', 'Задание планировщика · При входе в систему'), true),
+  S('Adobe Update Service', 'Adobe Inc.', '"C:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\armsvc.exe"', 'service', L('Service · Auto', 'Служба · Автоматически'), true, {state: 'Running', admin: true, scope: 'machine'})
 ];
 
 const updates = {checkedAt: new Date().toISOString(), items: [
@@ -83,13 +94,20 @@ const tree = {
 const savedScans = new Map();
 const earlier = () => new Date(Date.now() - 864e5 * 2 - 3.6e6 * 5).toISOString();
 
+// Cleaner location names. "key" keeps the English name, so saved results can be renamed in another language (as main.cjs relabel()).
+const SECONDARY = L('Secondary cache', 'Дополнительный кэш');
+const folderLabel = r => L(`${r.name.en} folder`, `Папка «${r.name.ru}»`);
+const locationLabel = key => key === SECONDARY.en ? SECONDARY : rules.map(folderLabel).find(l => l.en === key) || key;
+const relabel = analysis => ({...analysis, results: (analysis?.results || []).map(r => ({...r, locations: (r.locations || []).map(l => ({...l, key: l.key ?? l.label, label: locationLabel(l.key ?? l.label)}))}))});
+
+const FLUSH_DNS = L('Flush DNS cache', 'Очистить кэш DNS');
 const api = {
   'disk.last': async () => ({...await api['disk.analyze'](), at: earlier(), restored: true}),
-  'scans.load': async ({kind}) => savedScans.get(kind) || (kind === 'duplicates' ? {v: 1, savedAt: earlier(), data: {...await api['disk.duplicates'](), root: 'C:\\', roots: ['C:\\'], minSize: MB, at: earlier()}} : null),
+  'scans.load': async ({kind}) => { const saved = savedScans.get(kind); if (saved && kind === 'cleaner') return {...saved, data: relabel(saved.data)}; return saved || (kind === 'duplicates' ? {v: 1, savedAt: earlier(), data: {...await api['disk.duplicates'](), root: 'C:\\', roots: ['C:\\'], minSize: MB, at: earlier()}} : null); },
   'scans.save': ({kind, data}) => { if (data == null) savedScans.delete(kind); else savedScans.set(kind, {v: 1, savedAt: new Date().toISOString(), data: structuredClone(data)}); return {ok: true}; },
   'app.info': () => ({version: '1.0.0', electron: '44.8.0', dataPath: 'C:\\Users\\Alex\\AppData\\Roaming\\Aster'}),
   'system.info': () => MAC ? ({os: 'macOS Sequoia', osVersion: '15.6 (24G84)', build: 15, arch: 'arm64', hostname: 'Alex-MacBook-Pro', user: 'alex', model: 'MacBook Pro (Mac15,6)', cpu: 'Apple M3 Pro', cores: 12, gpu: ['Apple M3 Pro'], admin: false, mac: true, fda: false, memory: {total: 18 * GB, free: 3.1 * GB}, uptime: 302000, cpuLoad: 9,
-    drives: [{name: 'Macintosh HD', root: '/', label: 'Macintosh HD', format: 'APFS', type: 'Fixed', total: 994 * GB, free: 212 * GB}, {name: 'Backup', root: '/Volumes/Backup', label: 'Backup', type: 'Removable', total: 2000 * GB, free: 1210 * GB}]}) : ({os: 'Windows 11 Pro', osVersion: '25H2 (build 26200.6899)', arch: 'x64', hostname: 'ALEX-DESKTOP', user: 'alex', model: 'ASUS ROG Strix G16', cpu: 'AMD Ryzen 9 7945HX with Radeon Graphics', cores: 32, gpu: ['NVIDIA GeForce RTX 4070 Laptop GPU'], admin: false, memory: {total: 32 * GB, free: 13.4 * GB}, uptime: 192000, cpuLoad: 14,
+    drives: [{name: 'Macintosh HD', root: '/', label: 'Macintosh HD', format: 'APFS', type: 'Fixed', total: 994 * GB, free: 212 * GB}, {name: 'Backup', root: '/Volumes/Backup', label: 'Backup', type: 'Removable', total: 2000 * GB, free: 1210 * GB}]}) : ({os: 'Windows 11 Pro', osVersion: L('25H2 (build 26200.6899)', '25H2 (сборка 26200.6899)'), arch: 'x64', hostname: 'ALEX-DESKTOP', user: 'alex', model: 'ASUS ROG Strix G16', cpu: 'AMD Ryzen 9 7945HX with Radeon Graphics', cores: 32, gpu: ['NVIDIA GeForce RTX 4070 Laptop GPU'], admin: false, memory: {total: 32 * GB, free: 13.4 * GB}, uptime: 192000, cpuLoad: 14,
     drives: [{name: 'C:', label: 'Windows', format: 'NTFS', type: 'Fixed', total: 1000 * GB, free: 214 * GB}, {name: 'D:', label: 'Data', format: 'NTFS', type: 'Fixed', total: 2000 * GB, free: 1480 * GB}]}),
   'system.live': () => ({memory: {total: 32 * GB, free: (12 + Math.random() * 2) * GB}, cpuLoad: Math.round(8 + Math.random() * 18), uptime: 192000}),
   'system.relaunchAdmin': () => ({ok: true}),
@@ -97,19 +115,20 @@ const api = {
     notes: '## What\'s new\n\n**Cleaner: clean exactly what you want**\n- Delete a single file from Show largest files.\n- Clean a single location with the broom button next to it.\n- Faster scans of big cache folders.'}; },
   'appUpdate.download': async () => { for (let i = 1; i <= 20; i++) { emit({channel: 'appUpdate', phase: 'download', done: i * 5.55 * MB, total: 111 * MB}); await wait(120); } return {ok: true, version: '1.1.0'}; },
   'appUpdate.cancel': () => ({ok: true}),
-  'appUpdate.install': () => ({ok: true, restarting: !MAC, message: MAC ? 'Aster 1.1.0 is open in Finder. Quit Aster, drag the new Aster into Applications and choose Replace.' : 'Installing Aster 1.1.0. Aster will reopen in a moment.'}),
+  'appUpdate.install': () => ({ok: true, restarting: !MAC, message: MAC ? L('Aster 1.1.0 is open in Finder. Quit Aster, drag the new Aster into Applications and choose Replace.', 'Aster 1.1.0 открыт в Finder. Завершите Aster, перетащите новую версию в папку «Программы» и выберите «Заменить».') : L('Installing Aster 1.1.0. Aster will reopen in a moment.', 'Устанавливается Aster 1.1.0. Через несколько секунд Aster откроется снова.')}),
   'settings.get': () => settings,
   'settings.update': p => (settings = {...settings, ...p}),
   'settings.pickExclusion': () => 'D:\\Projects',
-  'cleaner.rules': () => ({groups: [{id: 'windows', name: 'Windows'}, {id: 'browsers', name: 'Browsers'}, {id: 'apps', name: 'Applications'}], rules}),
+  'cleaner.rules': () => ({groups: [{id: 'windows', name: 'Windows'}, {id: 'browsers', name: L('Browsers', 'Браузеры')}, {id: 'apps', name: L('Applications', 'Приложения')}], rules}),
   'cleaner.analyze': async ({ids}) => {
-    for (let i = 0; i < ids.length; i++) { emit({channel: 'cleaner', index: i, total: ids.length, label: rules.find(r => r.id === ids[i])?.app + ' · ' + rules.find(r => r.id === ids[i])?.name}); await wait(90); }
-    const results = ids.map(id => { const r = rules.find(x => x.id === id); return {id, bytes: Math.round(r.bytes), files: Math.round(r.bytes / 180000), running: r.processes.length && id === 'chrome.cache' ? ['chrome.exe'] : [], locations: [{label: r.name + ' folder', path: `C:\\Users\\Alex\\AppData\\Local\\${r.app}\\Cache`, drive: 'C:', bytes: Math.round(r.bytes * .8), files: Math.round(r.bytes / 220000)}, {label: 'Secondary cache', path: `D:\\Cache\\${r.app}`, drive: 'D:', bytes: Math.round(r.bytes * .2), files: Math.round(r.bytes / 900000)}], sample: [{path: `C:\\Users\\Alex\\AppData\\Local\\Temp\\${id}\\data_1.bin`, size: r.bytes / 6}, {path: `C:\\Users\\Alex\\AppData\\Local\\Temp\\${id}\\f_000231`, size: r.bytes / 9}]}; });
+    for (let i = 0; i < ids.length; i++) { emit({channel: 'cleaner', index: i, total: ids.length, label: rules.find(r => r.id === ids[i])?.app + ' · ' + tx(rules.find(r => r.id === ids[i])?.name)}); await wait(90); }
+    const results = ids.map(id => { const r = rules.find(x => x.id === id); return {id, bytes: Math.round(r.bytes), files: Math.round(r.bytes / 180000), running: r.processes.length && id === 'chrome.cache' ? ['chrome.exe'] : [], locations: [{label: folderLabel(r), key: `${r.name.en} folder`, path: `C:\\Users\\Alex\\AppData\\Local\\${r.app}\\Cache`, drive: 'C:', bytes: Math.round(r.bytes * .8), files: Math.round(r.bytes / 220000)}, {label: SECONDARY, key: SECONDARY.en, path: `D:\\Cache\\${r.app}`, drive: 'D:', bytes: Math.round(r.bytes * .2), files: Math.round(r.bytes / 900000)}], sample: [{path: `C:\\Users\\Alex\\AppData\\Local\\Temp\\${id}\\data_1.bin`, size: r.bytes / 6}, {path: `C:\\Users\\Alex\\AppData\\Local\\Temp\\${id}\\f_000231`, size: r.bytes / 9}]}; });
     return {results, totalBytes: results.reduce((n, r) => n + r.bytes, 0), totalFiles: results.reduce((n, r) => n + r.files, 0)};
   },
   'cleaner.clean': async ({ids}) => { for (let i = 0; i < ids.length; i++) { emit({channel: 'cleaner', index: i, total: ids.length, label: ids[i]}); await wait(120); } const freed = ids.reduce((n, id) => n + (rules.find(r => r.id === id)?.bytes || 0), 0); return {results: [], freed, deleted: Math.round(freed / 180000), skipped: 37}; },
+  'cleaner.relabel': ({analysis}) => relabel(analysis),
   'cleaner.cancel': () => ({ok: true}),
-  'registry.categories': () => cats.map(id => ({id, name: catNames[id], description: 'References to files or programs that no longer exist.', verdict: ['extensions', 'com', 'installer'].includes(id) ? 'review' : 'safe', defaultOn: !['extensions', 'com', 'installer'].includes(id), contains: 'Entries left behind by programs that were removed.', ifDeleted: 'Nothing visible; Windows stops referring to missing files.', advice: 'Safe housekeeping.'})),
+  'registry.categories': () => cats.map(id => ({id, name: catNames[id], description: L('References to files or programs that no longer exist.', 'Ссылки на файлы и программы, которых больше нет.'), verdict: ['extensions', 'com', 'installer'].includes(id) ? 'review' : 'safe', defaultOn: !['extensions', 'com', 'installer'].includes(id), contains: L('Entries left behind by programs that were removed.', 'Записи, оставшиеся после удалённых программ.'), ifDeleted: L('Nothing visible; Windows stops referring to missing files.', 'Внешне ничего не изменится: Windows перестанет обращаться к отсутствующим файлам.'), advice: L('Safe housekeeping.', 'Безопасная чистка.')})),
   'registry.scan': async () => { await wait(1400); return {items: issues.map(i => ({...i})), scannedAt: new Date().toISOString()}; },
   'registry.fix': async ({ids}) => { await wait(600); return {fixed: ids, failed: [], backup: 'x.reg'}; },
   'registry.list': ({path}) => !path ? {path: '', keys: ['HKEY_CLASSES_ROOT', 'HKEY_CURRENT_USER', 'HKEY_LOCAL_MACHINE', 'HKEY_USERS', 'HKEY_CURRENT_CONFIG'].map(name => ({name, hasChildren: true})), values: []}
@@ -120,7 +139,7 @@ const api = {
   'programs.icons': () => ({}),
   'programs.size': () => ({size: 123 * MB}),
   'programs.uninstall': async () => { await wait(1500); return {removed: true}; },
-  'programs.leftovers': async () => { await wait(700); return {items: [{id: 'l1', kind: 'folder', path: 'C:\\Users\\Alex\\AppData\\Roaming\\Old Game Launcher', reason: 'Matches program name', size: 214 * MB}, {id: 'l2', kind: 'registry', path: 'HKCU\\Software\\Old Game Launcher', reason: 'Program settings', detail: '12 values, 3 subkeys'}]}; },
+  'programs.leftovers': async () => { await wait(700); return {items: [{id: 'l1', kind: 'folder', path: 'C:\\Users\\Alex\\AppData\\Roaming\\Old Game Launcher', reason: L('Matches program name', 'Совпадает с названием программы'), size: 214 * MB}, {id: 'l2', kind: 'registry', path: 'HKCU\\Software\\Old Game Launcher', reason: L('Program settings', 'Настройки программы'), detail: L('12 values, 3 subkeys', '12 параметров, 3 подраздела')}]}; },
   'programs.removeLeftovers': () => ({removed: 2, failed: [], bytes: 214 * MB}),
   'programs.removeEntry': () => ({ok: true}),
   'startup.list': async () => { await wait(300); return {items: startup}; },
@@ -131,56 +150,56 @@ const api = {
   'updates.available': () => ({available: true}),
   'updates.check': async () => { await wait(900); return updates; },
   'updates.last': () => null,
-  'updates.update': async ({id}) => { for (const l of ['Found package', 'Downloading…', 'Successfully verified installer hash', 'Starting package install…']) { emit({channel: 'updates', id, line: l}); await wait(500); } updates.items = updates.items.filter(i => i.id !== id); return {ok: true}; },
+  'updates.update': async ({id}) => { for (const l of [L('Found package', 'Найден пакет'), L('Downloading…', 'Скачивание…'), L('Successfully verified installer hash', 'Хэш установщика успешно проверен'), L('Starting package install…', 'Запуск установки пакета…')]) { emit({channel: 'updates', id, line: l}); await wait(500); } updates.items = updates.items.filter(i => i.id !== id); return {ok: true}; },
   'disk.pickFolder': () => 'C:\\',
   'disk.analyze': async () => { for (let i = 1; i <= 8; i++) { emit({channel: 'disk', files: i * 51234, bytes: i * 48 * GB, current: 'C:\\Users\\Alex\\AppData\\Local\\Packages'}); await wait(150); } return {root: 'C:\\', size: 388 * GB, files: 768000, top: [{path: 'C:\\Users\\Alex\\Videos\\Trip 2026 (4K).mp4', size: 18.4 * GB, mtime: Date.now() - 864e5 * 40}, {path: 'C:\\hiberfil.sys', size: 12.8 * GB}, {path: 'C:\\Games\\Cyberpunk\\archive\\pc\\content\\basegame_4_gamedata.archive', size: 9.6 * GB}, {path: 'C:\\Users\\Alex\\Downloads\\ubuntu-26.04-desktop-amd64.iso', size: 6.1 * GB}], types: [{name: 'Video', bytes: 92 * GB, count: 410, exts: []}, {name: 'Programs', bytes: 71 * GB, count: 88000, exts: []}, {name: 'Disk images', bytes: 64 * GB, count: 2100, exts: []}, {name: 'Images', bytes: 22 * GB, count: 41000, exts: []}, {name: 'Archives', bytes: 18 * GB, count: 900, exts: []}, {name: 'Documents', bytes: 8 * GB, count: 12000, exts: []}, {name: 'Other', bytes: 113 * GB, count: 600000, exts: []}]}; },
   'disk.children': ({path}) => { const key = path.replace(/\\$/, '') || 'C:'; const kids = tree[path] || tree[key] || tree[key + '\\'] || [['Cache', 2 * GB, 4000], ['Data', 1 * GB, 1000]]; const items = kids.map(([name, size, files]) => ({name, path: (path.endsWith('\\') ? path : path + '\\') + name, size, files, dir: true})); items.push({name: 'pagefile.sys', path: path + '\\pagefile.sys', size: 8 * GB, dir: false, mtime: Date.now()}); const size = items.reduce((n, i) => n + i.size, 0); return {path, size, files: items.reduce((n, i) => n + (i.files || 1), 0), items}; },
   'disk.duplicates': async () => { await wait(1200); return {files: 48210, bytes: 210 * GB, wasted: 4.3 * GB, groups: [{size: 1.2 * GB, files: [{path: 'D:\\Backup\\Videos\\Wedding.mp4', mtime: Date.now() - 864e5 * 300}, {path: 'C:\\Users\\Alex\\Videos\\Wedding.mp4', mtime: Date.now() - 864e5 * 20}]}, {size: 640 * MB, files: [{path: 'C:\\Users\\Alex\\Downloads\\installer.iso', mtime: Date.now() - 864e5 * 90}, {path: 'C:\\Users\\Alex\\Downloads\\installer (1).iso', mtime: Date.now() - 864e5 * 10}, {path: 'D:\\ISO\\installer.iso', mtime: Date.now() - 864e5 * 200}]}]}; },
   'disk.cancel': () => ({ok: true}),
   'disk.trash': ({paths}) => ({done: paths, failed: [], bytes: 1.2 * GB}),
-  'disk.identify': ({items}) => Object.fromEntries(items.map(i => [i.path, /pagefile/i.test(i.path) ? {verdict: 'keep', kind: 'Windows virtual memory', owner: 'Windows', what: 'Windows uses this file as extra memory when RAM is full.', advice: 'Do not delete it.'} : /\.iso$/i.test(i.path) ? {verdict: 'safe', kind: 'Disk image', owner: 'Your downloads', what: 'An installer image.', advice: 'Safe to delete once installed.'} : /Games|Program/i.test(i.path) ? {verdict: 'keep', kind: 'Program folder', owner: 'Installed programs', what: 'Program files.', advice: 'Uninstall the program instead.'} : {verdict: 'review', kind: i.dir ? 'Folder' : 'Video', owner: i.dir ? null : 'You', what: 'Your own files.', advice: 'Delete only if you are sure.'}])),
-  'tweaks.list': ({groups}) => ({groups: {performance: 'Performance', gaming: 'Gaming', privacy: 'Privacy & ads', appearance: 'Appearance', explorer: 'File Explorer', taskbar: 'Taskbar & input'}, items: MOCK_TWEAKS.filter(t => groups.includes(t.group))}),
+  'disk.identify': ({items}) => Object.fromEntries(items.map(i => [i.path, /pagefile/i.test(i.path) ? {verdict: 'keep', kind: L('Windows virtual memory', 'Виртуальная память Windows'), owner: 'Windows', what: L('Windows uses this file as extra memory when RAM is full.', 'Windows использует этот файл как дополнительную память, когда не хватает оперативной.'), advice: L('Do not delete it.', 'Не удаляйте его.')} : /\.iso$/i.test(i.path) ? {verdict: 'safe', kind: L('Disk image', 'Образ диска'), owner: L('Your downloads', 'Ваши загрузки'), what: L('An installer image.', 'Образ установщика.'), advice: L('Safe to delete once installed.', 'После установки его можно удалить.')} : /Games|Program/i.test(i.path) ? {verdict: 'keep', kind: L('Program folder', 'Папка программы'), owner: L('Installed programs', 'Установленные программы'), what: L('Program files.', 'Файлы программы.'), advice: L('Uninstall the program instead.', 'Вместо этого удалите саму программу.')} : {verdict: 'review', kind: i.dir ? L('Folder', 'Папка') : L('Video', 'Видео'), owner: i.dir ? null : L('You', 'Вы'), what: L('Your own files.', 'Ваши личные файлы.'), advice: L('Delete only if you are sure.', 'Удаляйте, только если уверены.')}])),
+  'tweaks.list': ({groups}) => ({groups: {performance: L('Performance', 'Производительность'), gaming: L('Gaming', 'Игры'), privacy: L('Privacy & ads', 'Конфиденциальность и реклама'), appearance: L('Appearance', 'Оформление'), explorer: L('File Explorer', 'Проводник'), taskbar: L('Taskbar & input', 'Панель задач и ввод')}, items: MOCK_TWEAKS.filter(t => groups.includes(t.group))}),
   'tweaks.set': ({id, value}) => { const t = MOCK_TWEAKS.find(x => x.id === id); t.value = value; return {ok: true, value}; },
   'power.get': () => power, 'power.set': p => { if (p.guid) power.plans.forEach(x => { x.active = x.guid === p.guid; }); return power; }, 'power.addHigh': () => power,
-  'processes.list': () => ({items: [{name: 'chrome', description: 'Google Chrome', company: 'Google LLC', count: 37, memory: 4.4 * GB}, {name: 'Discord', description: 'Discord', company: 'Discord Inc.', count: 6, memory: 820 * MB}, {name: 'Code', description: 'Visual Studio Code', company: 'Microsoft Corporation', count: 12, memory: 1.3 * GB}, {name: 'dwm', description: 'Desktop Window Manager', company: 'Microsoft Corporation', count: 1, memory: 310 * MB, protected: true}]}),
+  'processes.list': () => ({items: [{name: 'chrome', description: 'Google Chrome', company: 'Google LLC', count: 37, memory: 4.4 * GB}, {name: 'Discord', description: 'Discord', company: 'Discord Inc.', count: 6, memory: 820 * MB}, {name: 'Code', description: 'Visual Studio Code', company: 'Microsoft Corporation', count: 12, memory: 1.3 * GB}, {name: 'dwm', description: L('Desktop Window Manager', 'Диспетчер окон рабочего стола'), company: 'Microsoft Corporation', count: 1, memory: 310 * MB, protected: true}]}),
   'processes.end': () => ({ok: true}), 'explorer.restart': () => ({ok: true}),
   'display.list': () => ({items: [{device: '\\\\.\\DISPLAY1', name: 'Dell AW3423DW', primary: true, width: 3440, height: 1440, freq: 60, modes: [175, 144, 120, 100, 60].map(f => ({w: 3440, h: 1440, f})).concat([{w: 2560, h: 1080, f: 60}, {w: 1920, h: 1080, f: 60}])}]}),
   'display.set': () => ({ok: true}),
-  'tools.catalog': () => ({actions: MAC ? [{id: 'snapshot', icon: 'restore', tone: 'blue', title: 'Create a Time Machine snapshot', text: 'Saves a local snapshot you can restore from.'}, {id: 'thin', icon: 'drive', tone: 'green', title: 'Free space used by local snapshots', text: 'Removes Time Machine local snapshots.'}, {id: 'dns', icon: 'network', tone: 'green', title: 'Flush DNS cache', text: 'Fixes sites that fail to load.', admin: true}, {id: 'bin', icon: 'trash', tone: 'amber', title: 'Empty the Trash', text: 'Permanently deletes everything in the Trash.'}] : [{id: 'restore', icon: 'restore', tone: 'blue', title: 'Create a restore point', text: 'Snapshot system settings before big changes.', admin: true}, {id: 'dns', icon: 'network', tone: 'green', title: 'Flush DNS cache', text: 'Fixes sites that fail to load after network changes.'}, {id: 'bin', icon: 'trash', tone: 'amber', title: 'Empty Recycle Bin', text: 'Permanently delete everything in the Recycle Bin.'}, {id: 'admin', icon: 'shield', tone: '', title: 'Restart as administrator', text: 'Unlock system-wide cleaning.'}],
-    launchers: MAC ? [['activity', 'Activity Monitor', 'gauge'], ['diskutil', 'Disk Utility', 'drive'], ['console', 'Console', 'list'], ['terminal', 'Terminal', 'terminal']] : [['taskmgr', 'Task Manager', 'gauge'], ['services', 'Services', 'sliders'], ['devmgmt', 'Device Manager', 'monitor'], ['regedit', 'Registry Editor', 'key']],
-    settings: MAC ? [['storage', 'Storage', 'pie'], ['update', 'Software Update', 'refresh'], ['loginitems', 'Login Items', 'power']] : [['storage', 'Storage Sense', 'pie'], ['update', 'Windows Update', 'refresh']], binRule: MAC ? 'macos.trash' : 'windows.recyclebin'}),
-  'tools.run': async () => { await wait(500); return {ok: true, message: 'Done'}; },
+  'tools.catalog': () => ({actions: MAC ? [{id: 'snapshot', icon: 'restore', tone: 'blue', title: L('Create a Time Machine snapshot', 'Создать снимок Time Machine'), text: L('Saves a local snapshot you can restore from.', 'Сохраняет локальный снимок, из которого можно восстановить систему.')}, {id: 'thin', icon: 'drive', tone: 'green', title: L('Free space used by local snapshots', 'Освободить место, занятое локальными снимками'), text: L('Removes Time Machine local snapshots.', 'Удаляет локальные снимки Time Machine.')}, {id: 'dns', icon: 'network', tone: 'green', title: FLUSH_DNS, text: L('Fixes sites that fail to load.', 'Помогает, если сайты не открываются.'), admin: true}, {id: 'bin', icon: 'trash', tone: 'amber', title: L('Empty the Trash', 'Очистить Корзину'), text: L('Permanently deletes everything in the Trash.', 'Безвозвратно удаляет всё содержимое Корзины.')}] : [{id: 'restore', icon: 'restore', tone: 'blue', title: L('Create a restore point', 'Создать точку восстановления'), text: L('Snapshot system settings before big changes.', 'Снимок системных параметров перед серьёзными изменениями.'), admin: true}, {id: 'dns', icon: 'network', tone: 'green', title: FLUSH_DNS, text: L('Fixes sites that fail to load after network changes.', 'Помогает, если после смены сети сайты не открываются.')}, {id: 'bin', icon: 'trash', tone: 'amber', title: L('Empty Recycle Bin', 'Очистить Корзину'), text: L('Permanently delete everything in the Recycle Bin.', 'Всё содержимое Корзины будет удалено безвозвратно.')}, {id: 'admin', icon: 'shield', tone: '', title: L('Restart as administrator', 'Перезапустить от имени администратора'), text: L('Unlock system-wide cleaning.', 'Открывает доступ к очистке всей системы.')}],
+    launchers: MAC ? [['activity', L('Activity Monitor', 'Мониторинг системы'), 'gauge'], ['diskutil', L('Disk Utility', 'Дисковая утилита'), 'drive'], ['console', L('Console', 'Консоль'), 'list'], ['terminal', L('Terminal', 'Терминал'), 'terminal']] : [['taskmgr', L('Task Manager', 'Диспетчер задач'), 'gauge'], ['services', L('Services', 'Службы'), 'sliders'], ['devmgmt', L('Device Manager', 'Диспетчер устройств'), 'monitor'], ['regedit', L('Registry Editor', 'Редактор реестра'), 'key']],
+    settings: MAC ? [['storage', L('Storage', 'Хранилище'), 'pie'], ['update', L('Software Update', 'Обновление ПО'), 'refresh'], ['loginitems', L('Login Items', 'Объекты входа'), 'power']] : [['storage', L('Storage Sense', 'Контроль памяти'), 'pie'], ['update', L('Windows Update', 'Центр обновления Windows'), 'refresh']], binRule: MAC ? 'macos.trash' : 'windows.recyclebin'}),
+  'tools.run': async () => { await wait(500); return {ok: true, message: L('Done', 'Готово')}; },
   'tools.launch': () => ({ok: true}), 'tools.flushDns': async () => { await wait(500); return {ok: true}; }, 'tools.restorePoint': () => ({ok: true}),
   'activity.list': () => activity, 'activity.stats': () => ({cleaned: 14.2 * GB, fixed: 968, lastClean: activity[0].at}),
   'backups.restore': () => ({ok: true}), 'backups.openFolder': () => ({ok: true}),
   'shell.reveal': () => ({ok: true}), 'shell.openUrl': () => ({ok: true})
 };
 
-const TW = (id, group, title, value, recommended, verdict, extra = {}) => ({id, group, title, type: 'toggle', value, recommended, verdict, what: 'Explains what this setting changes in Windows.', pro: 'What you gain from it.', con: 'What you give up.', on: 'On', off: 'Off', admin: false, restart: null, ...extra});
+const TW = (id, group, title, value, recommended, verdict, extra = {}) => ({id, group, title, type: 'toggle', value, recommended, verdict, what: L('Explains what this setting changes in Windows.', 'Здесь объясняется, что этот параметр меняет в Windows.'), pro: L('What you gain from it.', 'Что вы получаете.'), con: L('What you give up.', 'Чем придётся пожертвовать.'), on: L('On', 'Вкл.'), off: L('Off', 'Выкл.'), admin: false, restart: null, ...extra});
 const MOCK_TWEAKS = [
-  TW('startupDelay', 'performance', 'Start apps right after sign-in', false, true, 'recommended', {on: 'No delay', off: 'Windows default delay'}),
-  TW('menuDelay', 'performance', 'Faster menus', false, true, 'recommended'),
-  TW('animations', 'performance', 'Turn off animation effects', false, null, 'situational'),
-  TW('hibernation', 'performance', 'Turn off hibernation', false, null, 'situational', {admin: true, extra: {bytes: 12.8 * GB}}),
-  TW('gameMode', 'gaming', 'Game Mode', true, true, 'recommended'),
-  TW('gameDvr', 'gaming', 'Turn off background game recording', false, true, 'recommended'),
-  TW('hags', 'gaming', 'Hardware-accelerated GPU scheduling', false, null, 'optional', {admin: true, restart: 'reboot'}),
-  TW('adId', 'privacy', 'Turn off advertising ID', false, true, 'recommended'),
-  TW('tips', 'privacy', 'Turn off tips, suggestions and lock-screen ads', false, true, 'recommended'),
-  {...TW('appTheme', 'appearance', 'App colour mode', 'light', null, 'preference'), type: 'choice', options: [{value: 'light', label: 'Light'}, {value: 'dark', label: 'Dark'}]},
-  TW('showExt', 'explorer', 'Show file extensions', false, true, 'recommended', {restart: 'explorer', on: 'Shown', off: 'Hidden'}),
-  TW('classicMenu', 'explorer', 'Classic right-click menu', false, null, 'preference', {restart: 'explorer'}),
-  {...TW('taskbarAlign', 'taskbar', 'Taskbar alignment', 'center', null, 'preference'), type: 'choice', options: [{value: 'center', label: 'Center'}, {value: 'left', label: 'Left'}], pro: null, con: null},
-  TW('clipboardHistory', 'taskbar', 'Clipboard history (Win+V)', false, true, 'recommended')
+  TW('startupDelay', 'performance', L('Start apps right after sign-in', 'Запускать программы сразу после входа в систему'), false, true, 'recommended', {on: L('No delay', 'Без задержки'), off: L('Windows default delay', 'Обычная задержка Windows')}),
+  TW('menuDelay', 'performance', L('Faster menus', 'Быстрое открытие меню'), false, true, 'recommended'),
+  TW('animations', 'performance', L('Turn off animation effects', 'Отключить эффекты анимации'), false, null, 'situational'),
+  TW('hibernation', 'performance', L('Turn off hibernation', 'Отключить гибернацию'), false, null, 'situational', {admin: true, extra: {bytes: 12.8 * GB}}),
+  TW('gameMode', 'gaming', L('Game Mode', 'Игровой режим'), true, true, 'recommended'),
+  TW('gameDvr', 'gaming', L('Turn off background game recording', 'Отключить фоновую запись игр'), false, true, 'recommended'),
+  TW('hags', 'gaming', L('Hardware-accelerated GPU scheduling', 'Планирование графического процессора с аппаратным ускорением'), false, null, 'optional', {admin: true, restart: 'reboot'}),
+  TW('adId', 'privacy', L('Turn off advertising ID', 'Отключить рекламный идентификатор'), false, true, 'recommended'),
+  TW('tips', 'privacy', L('Turn off tips, suggestions and lock-screen ads', 'Отключить советы, рекомендации и рекламу на экране блокировки'), false, true, 'recommended'),
+  {...TW('appTheme', 'appearance', L('App colour mode', 'Цветовой режим приложений'), 'light', null, 'preference'), type: 'choice', options: [{value: 'light', label: L('Light', 'Светлый')}, {value: 'dark', label: L('Dark', 'Тёмный')}]},
+  TW('showExt', 'explorer', L('Show file extensions', 'Показывать расширения файлов'), false, true, 'recommended', {restart: 'explorer', on: L('Shown', 'Показаны'), off: L('Hidden', 'Скрыты')}),
+  TW('classicMenu', 'explorer', L('Classic right-click menu', 'Классическое контекстное меню'), false, null, 'preference', {restart: 'explorer'}),
+  {...TW('taskbarAlign', 'taskbar', L('Taskbar alignment', 'Выравнивание панели задач'), 'center', null, 'preference'), type: 'choice', options: [{value: 'center', label: L('Center', 'По центру')}, {value: 'left', label: L('Left', 'Слева')}], pro: null, con: null},
+  TW('clipboardHistory', 'taskbar', L('Clipboard history (Win+V)', 'Журнал буфера обмена (Win+V)'), false, true, 'recommended')
 ];
-const power = {plans: [{guid: '381b4222-f694-41f0-9685-ff5bb260df2e', name: 'Balanced', active: true}, {guid: 'a1841308-3541-4fab-bc81-f71556f20b4a', name: 'Power saver', active: false}], screenAc: 600, screenDc: 300, sleepAc: 1800, sleepDc: 900, battery: false};
+const power = {plans: [{guid: '381b4222-f694-41f0-9685-ff5bb260df2e', name: L('Balanced', 'Сбалансированная'), active: true}, {guid: 'a1841308-3541-4fab-bc81-f71556f20b4a', name: L('Power saver', 'Экономия энергии'), active: false}], screenAc: 600, screenDc: 300, sleepAc: 1800, sleepDc: 900, battery: false};
 
 export const mockApi = {
   async invoke(method, args) {
     const fn = api[method];
-    if (!fn) throw new Error(`Preview: ${method} is not available`);
+    if (!fn) throw new Error(`Preview: ${method} is not available`); // developer-only message: stays in English
     await wait(60);
-    return structuredClone(await fn(args || {}));
+    return structuredClone(loc(await fn(args || {})));
   },
   on(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 };

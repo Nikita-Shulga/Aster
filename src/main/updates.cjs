@@ -2,6 +2,7 @@
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const {td} = require('./i18n.cjs');
 
 function wingetPath() {
   const alias = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WindowsApps', 'winget.exe');
@@ -82,7 +83,7 @@ class Updates {
       const ok = code === 0;
       if (ok) {
         this.cache.items = this.cache.items.filter(r => r.id !== id);
-        this.store.log({kind: 'update', title: `Updated ${row.name} to ${row.available}`});
+        this.store.log({kind: 'update', key: 'activity.updated', vars: {name: row.name, version: row.available}});
       }
       return {ok, code, message: ok ? null : lastMeaningful(out)};
     } finally { this.busy = false; }
@@ -91,7 +92,7 @@ class Updates {
 
 function lastMeaningful(out) {
   const lines = out.split(/\r?\n|\r/).map(cleanLine).filter(l => l && !/^[█▒\s\d.%KMGB/]+$/.test(l));
-  return lines.slice(-2).join(' ').slice(0, 300) || 'The installer reported an error.';
+  return lines.slice(-2).join(' ').slice(0, 300) || td('The installer reported an error.');
 }
 
 module.exports = {Updates, parseTable};

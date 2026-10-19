@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {psJson, powershell, arr} = require('./ps.cjs');
 const S = require('./registry-ps.cjs');
+const {t, td} = require('./i18n.cjs');
 
 const LIST = String.raw`
 $items = New-Object System.Collections.Generic.List[object]
@@ -159,7 +160,7 @@ class Programs {
     if (!item) throw new Error('Refresh the program list and try again.');
     if (item.type === 'store') {
       await psJson(REMOVE_APPX, {key: item.key}, {timeout: 300000});
-      this.store.log({kind: 'uninstall', title: `Uninstalled ${item.name}`});
+      this.store.log({kind: 'uninstall', key: 'activity.uninstalled', vars: {name: item.name}});
       return {removed: true};
     }
     const command = (quiet && item.quiet) ? item.quiet : (item.uninstall || item.quiet);
@@ -178,7 +179,7 @@ class Programs {
       if (removed) break;
       await new Promise(r => setTimeout(r, 1500));
     }
-    if (removed) this.store.log({kind: 'uninstall', title: `Uninstalled ${item.name}`});
+    if (removed) this.store.log({kind: 'uninstall', key: 'activity.uninstalled', vars: {name: item.name}});
     return {removed};
   }
 
@@ -188,7 +189,7 @@ class Programs {
     const backup = this.store.newBackupFile('uninstall-entry');
     const r = arr(await psJson(S.BACKUP_AND_DELETE, {file: backup.file, items: [{id, path: item.key, action: 'deleteKey'}]}));
     if (!r[0]?.ok) throw new Error(r[0]?.error || 'Could not remove the entry. Administrator rights may be required.');
-    this.store.log({kind: 'uninstall', title: `Removed program entry: ${item.name}`, backup: backup.name});
+    this.store.log({kind: 'uninstall', key: 'activity.entryRemoved', vars: {name: item.name}, backup: backup.name});
     return {ok: true, backup: backup.name};
   }
 
@@ -243,11 +244,13 @@ class Programs {
     }
     if (item.type === 'desktop') regCandidates.add(item.key);
     const keys = arr(await psJson(FIND_KEYS, {candidates: [...regCandidates].filter(k => !/\\(Microsoft|Classes|Policies|WOW6432Node)$/i.test(k))}).catch(() => []));
-    const regList = keys.filter(k => k.path.split('\\').length >= 3).map(k => ({kind: 'registry', path: k.path, reason: k.path === item.key ? 'Uninstall entry' : 'Program settings', detail: `${k.values} values, ${k.keys} subkeys`}));
+    const regList = keys.filter(k => k.path.split('\\').length >= 3).map(k => ({kind: 'registry', path: k.path, reason: k.path === item.key ? 'Uninstall entry' : 'Program settings', detail: `${t('programs.leftoverValues', {count: String(k.values)})}, ${t('programs.leftoverSubkeys', {count: String(k.keys)})}`}));
 
     const all = [...folderList, ...regList].map(x => ({...x, id: crypto.createHash('sha1').update(x.kind + x.path).digest('hex').slice(0, 16)}));
     this.leftovers.set(id, new Map(all.map(x => [x.id, x])));
-    return {program: publicItem(item), items: all};
+    // Reasons stay English in the cache and are translated on the way out; installFolder marks the item
+    // the renderer leaves unticked before the uninstall (it used to compare the English reason).
+    return {program: publicItem(item), items: all.map(x => ({...x, reason: td(x.reason), ...(x.reason === 'Install folder' ? {installFolder: true} : {})}))};
   }
 
   async removeLeftovers({programId, ids}) {
@@ -269,7 +272,7 @@ class Programs {
       for (const x of r) { if (x.ok) removed++; else failed.push({path: map.get(x.id)?.path, error: x.error}); }
     }
     const program = this.items.get(programId);
-    this.store.log({kind: 'leftovers', title: `Removed ${removed} leftover${removed === 1 ? '' : 's'} of ${program?.name || 'a program'}`, count: removed, bytes, backup});
+    this.store.log({kind: 'leftovers', key: program?.name ? 'activity.leftoversOf' : 'activity.leftoversOfProgram', vars: {count: removed, name: program?.name}, count: removed, bytes, backup});
     return {removed, failed, bytes, backup};
   }
 }

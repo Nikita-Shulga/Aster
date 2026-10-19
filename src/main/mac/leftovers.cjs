@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const {osa, asString, plist, mapLimit, LIB} = require('./sh.cjs');
 const {findApps, SYSTEM_ROOTS} = require('./programs.cjs');
 const {dirSize} = require('../programs.cjs');
+const {td} = require('../i18n.cjs');
 
 const CATEGORIES = [
   {id: 'prefs', name: 'Settings of removed apps', verdict: 'safe', defaultOn: true, description: 'Preference files (.plist) of apps that are no longer installed.',
@@ -50,7 +51,8 @@ function macosComponentNames() {
 
 class MacLeftovers {
   constructor({store, trash}) { this.store = store; this.trash = trash; this.issues = new Map(); }
-  categories() { return CATEGORIES; }
+  // Category text is written in English above and shown in the interface language.
+  categories() { return CATEGORIES.map(c => ({...c, name: td(c.name), description: td(c.description), contains: td(c.contains), ifDeleted: td(c.ifDeleted), advice: td(c.advice)})); }
 
   async installed() {
     const apps = await findApps(['/Applications', '/Applications/Utilities', path.join(require('node:os').homedir(), 'Applications'), ...SYSTEM_ROOTS, '/System/Library/CoreServices'], 3);
@@ -130,7 +132,7 @@ class MacLeftovers {
         fixed.push(it.id); this.issues.delete(it.id);
       } catch (e) { failed.push({id: it.id, error: e.message}); }
     }
-    this.store.log({kind: 'registry', title: `Moved ${fixed.length} leftover item${fixed.length === 1 ? '' : 's'} to the Trash`, count: fixed.length, bytes: items.filter(i => fixed.includes(i.id)).reduce((n, i) => n + (i.size || 0), 0)});
+    this.store.log({kind: 'registry', key: 'activity.macLeftovers', vars: {count: fixed.length}, count: fixed.length, bytes: items.filter(i => fixed.includes(i.id)).reduce((n, i) => n + (i.size || 0), 0)});
     return {fixed, failed, backup: null};
   }
 

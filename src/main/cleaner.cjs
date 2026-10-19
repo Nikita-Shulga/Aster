@@ -4,6 +4,7 @@ const path = require('node:path');
 const isMac = process.platform === 'darwin';
 const {allRules, GROUPS} = isMac ? require('./mac/cleaner-rules.cjs') : require('./cleaner-rules.cjs');
 const {powershell, run, sys32} = require('./ps.cjs');
+const {t, td, tdLabel} = require('./i18n.cjs');
 
 const SAMPLE = 40;
 
@@ -90,11 +91,12 @@ async function recycleBinTargets(drives) {
 class Cleaner {
   constructor({getSettings, getDrives, trash}) { this.getSettings = getSettings; this.getDrives = getDrives; this.trash = trash; this.abort = null; }
 
+  // Rule text is written in English in the rule tables and shown in the interface language.
   rules() {
-    return {groups: GROUPS, rules: allRules().map(r => ({
-      id: r.id, group: r.group, app: r.app, appId: r.appId, name: r.name, description: r.description,
+    return {groups: GROUPS.map(g => ({...g, name: td(g.name)})), rules: allRules().map(r => ({
+      id: r.id, group: r.group, app: td(r.app), appId: r.appId, name: td(r.name), description: td(r.description),
       defaultOn: !!r.defaultOn, admin: !!r.admin, privacy: !!r.privacy, caution: !!r.caution, fda: !!r.fda,
-      verdict: r.verdict || 'safe', contains: r.contains || '', ifDeleted: r.ifDeleted || '', advice: r.advice || '',
+      verdict: r.verdict || 'safe', contains: td(r.contains || ''), ifDeleted: td(r.ifDeleted || ''), advice: td(r.advice || ''),
       processes: r.processes || [], installed: r.installed ? !!r.installed() : true
     }))};
   }
@@ -118,13 +120,15 @@ class Cleaner {
     let i = 0;
     for (const rule of rules) {
       if (ctx.signal.aborted) break;
-      onProgress({phase: 'analyze', ruleId: rule.id, label: `${rule.app} · ${rule.name}`, index: i++, total: rules.length});
+      onProgress({phase: 'analyze', ruleId: rule.id, label: `${td(rule.app)} · ${td(rule.name)}`, index: i++, total: rules.length});
       const running = (rule.processes || []).filter(p => procs.has(p.toLowerCase()));
       let bytes = 0, files = 0; const sample = [];
       const locations = [];
       for (const target of await this.targetsFor(rule)) {
         const where = target.dir || target.file;
-        const loc = {label: target.label || rule.name, path: where, drive: volumeOf(where), bytes: 0, files: 0};
+        // key: the English name, so saved results can be renamed when the interface language changes.
+        const key = target.label || rule.name;
+        const loc = {label: tdLabel(key), key, path: where, drive: volumeOf(where), bytes: 0, files: 0};
         await walk(target, async (file, st) => {
           bytes += st.size; files++; loc.bytes += st.size; loc.files++;
           if (sample.length < SAMPLE) sample.push({path: file, size: st.size});
@@ -162,9 +166,9 @@ class Cleaner {
     let i = 0;
     for (const rule of rules) {
       if (ctx.signal.aborted) break;
-      onProgress({phase: 'clean', ruleId: rule.id, label: `${rule.app} · ${rule.name}`, index: i++, total: rules.length});
+      onProgress({phase: 'clean', ruleId: rule.id, label: `${td(rule.app)} · ${td(rule.name)}`, index: i++, total: rules.length});
       const running = (rule.processes || []).filter(p => procs.has(p.toLowerCase()));
-      if (running.length) { results.push({id: rule.id, freed: 0, deleted: 0, skipped: 0, blocked: `${rule.app} is running`}); continue; }
+      if (running.length) { results.push({id: rule.id, freed: 0, deleted: 0, skipped: 0, blocked: t('cleaner.appRunning', {app: td(rule.app)})}); continue; }
       let freed = 0, deleted = 0, skipped = 0;
       if (rule.special === 'recyclebin') {
         const before = await this.analyze({ids: [rule.id]});
@@ -199,7 +203,7 @@ class Cleaner {
 // rule's own locations, so a forged path can never reach anything else.
 Cleaner.prototype.removeFiles = async function ({id, paths}) {
   const rule = allRules().find(r => r.id === id);
-  if (!rule) throw new Error('Analyze again and retry.');
+  if (!rule) throw new Error(t('cleaner.analyzeAgain'));
   const targets = await this.targetsFor(rule);
   const exclusions = (this.getSettings().exclusions || []).filter(Boolean);
   const inside = p => targets.some(t => t.file ? under(p, [path.resolve(t.file)]) : under(p, [path.resolve(t.dir)]) && p !== path.resolve(t.dir) && (t.recursive || path.dirname(p) === path.resolve(t.dir)) && (!t.match || t.match.test(path.basename(p))) && !(t.exclude && under(p, t.exclude)));
@@ -207,10 +211,10 @@ Cleaner.prototype.removeFiles = async function ({id, paths}) {
   let freed = 0;
   for (const raw of (Array.isArray(paths) ? paths : []).slice(0, 500)) {
     const p = typeof raw === 'string' && path.isAbsolute(raw) ? path.resolve(raw) : null;
-    if (!p || !inside(p) || (exclusions.length && under(p, exclusions))) { failed.push({path: raw, error: 'Not part of this item.'}); continue; }
+    if (!p || !inside(p) || (exclusions.length && under(p, exclusions))) { failed.push({path: raw, error: t('cleaner.notPartOfItem')}); continue; }
     try {
       const st = await fs.lstat(p);
-      if (!st.isFile()) throw new Error('Not a file.');
+      if (!st.isFile()) throw new Error(t('cleaner.notAFile'));
       await this.trash(p);
       done.push(p); freed += st.size;
     } catch (e) { failed.push({path: p, error: e.message}); }

@@ -4,6 +4,7 @@
 // → executable metadata (company/product) → file type.
 const path = require('node:path');
 const {psJson, arr} = require('./ps.cjs');
+const {td} = require('./i18n.cjs');
 
 const env = k => (process.env[k] || '').toLowerCase().replace(/\\+$/, '');
 const SYS = env('SystemDrive') || 'c:';
@@ -48,7 +49,17 @@ function folderOwnerName(rel) {
   return rel.split('\\').filter(Boolean)[0] || null;
 }
 
-function classify(p, isDir, programs) {
+// Owners that are descriptions rather than names; program, folder and brand names are left as they are.
+const OWNERS = new Set(['Installers', 'Game launcher', 'Temporary files', 'Your downloads', 'You']);
+
+// The explanation in the interface language: the tables stay in English and td() translates them on the way out.
+function translate(info) {
+  return {...info, kind: td(info.kind), what: td(info.what), advice: td(info.advice), owner: OWNERS.has(info.owner) ? td(info.owner) : info.owner};
+}
+
+function classify(p, isDir, programs) { return translate(explain(p, isDir, programs)); }
+
+function explain(p, isDir, programs) {
   const l = p.toLowerCase().replace(/\\+$/, '');
   const name = path.basename(l);
   const owner = matchProgram(l, programs);
@@ -67,7 +78,7 @@ function classify(p, isDir, programs) {
   if (/^[a-z]:\\system volume information(\\|$)/.test(l)) return R('keep', 'System Restore points', 'Restore points and shadow copies that let you roll back Windows.', 'Manage them in System Properties → System Protection → Configure (you can lower the space used).', 'Windows');
   if (/^[a-z]:\\\$windows\.~(bt|ws)(\\|$)/.test(l)) return R('safe', 'Windows upgrade leftovers', 'Temporary files from a Windows upgrade.', 'Remove via Settings → Storage → Temporary files.', 'Windows');
   if (l === PD + '\\package cache' || l.startsWith(PD + '\\package cache\\')) return R('keep', 'Installer package cache', 'Installers kept by Visual Studio, .NET and other programs to repair or uninstall them later.', 'Do not delete — those programs may fail to update or uninstall.', 'Installers');
-  if (/\\steamapps\\common\\[^\\]+/.test(l)) { const game = p.match(/\\steamapps\\common\\([^\\]+)/i)[1]; return R('review', 'Steam game', `Files of the game "${titleCase(game)}".`, 'Don’t delete files by hand — uninstall the game in Steam to free this space.', `Steam · ${titleCase(game)}`); }
+  if (/\\steamapps\\common\\[^\\]+/.test(l)) { const game = p.match(/\\steamapps\\common\\([^\\]+)/i)[1]; return R('review', 'Steam game', td('Files of the game "{game}".', {game: titleCase(game)}), 'Don’t delete files by hand — uninstall the game in Steam to free this space.', `Steam · ${titleCase(game)}`); }
   if (/\\steamapps\\(shadercache|downloading|temp)(\\|$)/.test(l)) return R('safe', 'Steam cache / unfinished downloads', 'Shader cache or incomplete downloads of Steam.', 'Safe to delete; Steam recreates what it needs.', 'Steam');
   if (/\\steamapps\\workshop(\\|$)/.test(l)) return R('review', 'Steam Workshop mods', 'Mods you subscribed to in Steam Workshop.', 'Unsubscribe in Steam to remove them properly.', 'Steam');
   if (/\\(epic games|ubisoft game launcher\\games|gog galaxy\\games|xboxgames|ea games)\\/.test(l)) return R('review', 'Game', 'Files of an installed game.', 'Uninstall the game from its launcher instead of deleting files.', 'Game launcher');
@@ -77,30 +88,30 @@ function classify(p, isDir, programs) {
   if (HOME && l.startsWith(HOME + '\\downloads')) return withOwner(extInfo(l, isDir) || R('review', 'Download', 'Something you downloaded from the internet.', 'Safe to delete if you no longer need it — downloads are rarely needed after use.'), owner || 'Your downloads');
   if (HOME && /\\(videos|pictures|documents|desktop|music)(\\|$)/.test(l.slice(HOME.length)) && l.startsWith(HOME)) return withOwner(extInfo(l, isDir) || R('review', 'Personal files', 'Your own files.', 'Only delete what you are sure you don’t need. Consider moving large files to another drive.'), 'You');
 
-  if (owner && !isDir && /\.(exe|dll)$/.test(l)) return R('keep', 'Program file', `Part of ${owner}.`, `Uninstall ${owner} in Programs instead of deleting its files.`, owner);
+  if (owner && !isDir && /\.(exe|dll)$/.test(l)) return R('keep', 'Program file', td('Part of {owner}.', {owner}), td('Uninstall {owner} in Programs instead of deleting its files.', {owner}), owner);
   const ext = !isDir && extInfo(l, false);
   if (owner) {
     const inProgramFiles = PF.some(pf => l.startsWith(pf + '\\'));
     if (ext && (ext.verdict === 'safe')) return withOwner(ext, owner);
-    if (inProgramFiles) return R('keep', ext?.kind || (isDir ? 'Program folder' : 'Program file'), `Belongs to the installed program ${owner}.`, `Don’t delete files here — uninstall ${owner} from Programs to remove it completely.`, owner);
-    return R('review', ext?.kind || (isDir ? 'App data' : 'App data file'), `Settings, cache or data of ${owner}.`, `Deleting can reset or break ${owner}. Use the Cleaner for its cache, or uninstall ${owner} if you don’t use it.`, owner);
+    if (inProgramFiles) return R('keep', ext?.kind || (isDir ? 'Program folder' : 'Program file'), td('Belongs to the installed program {owner}.', {owner}), td('Don’t delete files here — uninstall {owner} from Programs to remove it completely.', {owner}), owner);
+    return R('review', ext?.kind || (isDir ? 'App data' : 'App data file'), td('Settings, cache or data of {owner}.', {owner}), td('Deleting can reset or break {owner}. Use the Cleaner for its cache, or uninstall {owner} if you don’t use it.', {owner}), owner);
   }
   // Unknown owner, but known place.
   for (const [root, label] of [[ROAMING, 'roaming app data'], [LOCAL, 'local app data'], [PD, 'shared app data']]) {
     if (root && l.startsWith(root + '\\')) {
       const folder = folderOwnerName(p.slice(root.length));
       if (ext && ext.verdict === 'safe') return withOwner(ext, titleCase(folder));
-      return R('review', 'App data', `Data stored by an app in its "${titleCase(folder)}" folder (${label}). No installed program with that name was found — it may be left over from an uninstalled app.`, 'If you don’t recognise or use that app anymore, it is usually safe to delete. If unsure, leave it.', titleCase(folder));
+      return R('review', 'App data', td('Data stored by an app in its "{folder}" folder ({location}). No installed program with that name was found — it may be left over from an uninstalled app.', {folder: titleCase(folder), location: td(label)}), 'If you don’t recognise or use that app anymore, it is usually safe to delete. If unsure, leave it.', titleCase(folder));
     }
   }
   if (PF.some(pf => l.startsWith(pf + '\\'))) {
     const folder = folderOwnerName(p.slice(PF.find(pf => l.startsWith(pf + '\\')).length));
-    return R('review', 'Program folder', `Program files in "${titleCase(folder)}", which isn't in the installed programs list — possibly a leftover of an uninstalled app or a portable program.`, 'If you no longer use that program, you can delete the folder. Check Programs first.', titleCase(folder));
+    return R('review', 'Program folder', td('Program files in "{folder}", which isn\'t in the installed programs list — possibly a leftover of an uninstalled app or a portable program.', {folder: titleCase(folder)}), 'If you no longer use that program, you can delete the folder. Check Programs first.', titleCase(folder));
   }
   if (ext) return ext;
   if (isDir) return R('review', 'Folder', 'A folder Aster can’t attribute to a specific program.', 'Open it to see what’s inside before deciding.');
   const parent = path.basename(path.dirname(p));
-  return R('review', 'Unknown file', `Aster can’t tell which program created this file — its name and type (${path.extname(p) || 'no extension'}) are not a known format. It is stored in the folder "${parent}".`, 'The folder name is the best clue. If you created that folder or recognise the app, decide based on that; otherwise it’s safer to leave the file alone.', parent ? titleCase(parent) : null);
+  return R('review', 'Unknown file', td('Aster can’t tell which program created this file — its name and type ({ext}) are not a known format. It is stored in the folder "{folder}".', {ext: path.extname(p) || td('no extension'), folder: parent}), 'The folder name is the best clue. If you created that folder or recognise the app, decide based on that; otherwise it’s safer to leave the file alone.', parent ? titleCase(parent) : null);
 }
 
 function extInfo(l, isDir) { if (isDir) return null; const hit = EXT.find(([re]) => re.test(l)); return hit ? {...hit[1]} : null; }
@@ -144,7 +155,7 @@ async function identify({items, programs}) {
     const m = meta.get(it.path.toLowerCase());
     if (m && (m.product || m.company)) {
       info.owner = info.owner || [m.product, m.company].filter(Boolean)[0];
-      if (m.description) info.what = `${m.description}${m.company ? ` by ${m.company}` : ''}. ${info.what}`;
+      if (m.description) info.what = m.company ? td('{description} by {company}. {what}', {description: m.description, company: m.company, what: info.what}) : `${m.description}. ${info.what}`;
     }
     out[it.path] = info;
   }

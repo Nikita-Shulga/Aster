@@ -3,6 +3,7 @@
 // Scripts never interpolate renderer input: dynamic data is passed as JSON on stdin.
 const {spawn, execFile} = require('node:child_process');
 const path = require('node:path');
+const {t} = require('./i18n.cjs');
 
 const SYSTEM_ROOT = /^[a-z]:\\windows\\?$/i.test(process.env.SystemRoot || '') ? process.env.SystemRoot : 'C:\\Windows';
 const sys32 = (...p) => path.join(SYSTEM_ROOT, 'System32', ...p);
@@ -20,19 +21,19 @@ const BOOTSTRAP = "[Console]::InputEncoding = New-Object System.Text.UTF8Encodin
 
 function powershell(script, {input = null, timeout = 60000} = {}) {
   return new Promise((resolve, reject) => {
-    if (process.platform !== 'win32') return reject(new Error('This feature requires Windows.'));
+    if (process.platform !== 'win32') return reject(new Error(t('ps.requiresWindows')));
     // The script travels on stdin after one line of JSON input; long scripts exceed the command-line limit.
     const encoded = Buffer.from(BOOTSTRAP, 'utf16le').toString('base64');
     const child = spawn(POWERSHELL, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {windowsHide: true});
     let out = '', err = '';
-    const timer = setTimeout(() => { child.kill(); reject(new Error('The operation timed out.')); }, timeout);
+    const timer = setTimeout(() => { child.kill(); reject(new Error(t('ps.timedOut'))); }, timeout);
     child.stdout.setEncoding('utf8').on('data', d => { out += d; });
     child.stderr.setEncoding('utf8').on('data', d => { err += d; });
     child.on('error', e => { clearTimeout(timer); reject(e); });
     child.on('close', code => {
       clearTimeout(timer);
       if (code === 0) resolve(out.replace(/^\uFEFF/, ''));
-      else reject(new Error(cleanError(err) || `PowerShell exited with code ${code}`));
+      else reject(new Error(cleanError(err) || t('ps.exitCode', {code: String(code)})));
     });
     child.stdin.on('error', () => {});
     child.stdin.end((input == null ? '' : JSON.stringify(input)) + '\n' + PREAMBLE + script);

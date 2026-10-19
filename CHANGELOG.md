@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Aster speaks Russian**: *Settings → Language → Interface language* switches between **English** and **Русский** right away, without a restart. Everything is translated — pages, dialogs and messages, the explanation of every cleaner item, registry category, tweak and file type, History entries (older ones too) and the macOS menu bar. Numbers, sizes and dates follow the chosen language (“1,5 ГБ”). English stays the default for new and existing users; Aster never picks the language from the system.
+
 ## 2.3.0 — 2026-10-19
 - **Results stay after you close Aster**: the last Disk analyzer, Duplicates and Cleaner results are saved and shown again when you reopen Aster, marked *Results from your previous scan* with the date, next to the button for a fresh scan. You can still click into folders of a saved disk analysis; duplicate files that no longer exist are left out. Results are stored compressed in Aster's data folder, on Windows and macOS.
 

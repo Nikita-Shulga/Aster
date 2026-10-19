@@ -1,8 +1,9 @@
-import {html, ic, api, app, bytes, num, plural, date, checkbox, empty, modal, toast, bar, pct, onEvent, previousScan} from '../lib.js';
+import {html, ic, api, app, bytes, num, date, checkbox, empty, modal, toast, bar, pct, onEvent, previousScan, t, th} from '../lib.js';
 import {definePage} from '../page.js';
 import {chip, countOptions, search as searchBox, filterHandlers, driveOf, baseName} from '../filters.js';
 import {isMac} from '../lib.js';
-const TRASH_WORD = isMac ? 'Trash' : 'Recycle Bin';
+// Sentences that name the Trash (macOS) or the Recycle Bin (Windows) have a "…Mac" variant of the key.
+const tb = (key, vars) => t(isMac ? `${key}Mac` : key, vars);
 const rootOf = d => d.root || `${d.name}\\`;
 
 const s = {phase: 'idle', root: null, roots: null, minSize: 1024 * 1024, result: null, selected: new Set(), limit: 100, restored: false, triedLast: false};
@@ -15,7 +16,7 @@ onEvent(e => {
   if (!el) return;
   const hashing = e.phase === 'hash';
   const ratio = hashing && e.totalToHash ? Math.min(100, e.hashed / e.totalToHash * 100) : null;
-  el.innerHTML = `<div class="row" style="gap:28px;margin-bottom:8px"><div class="stat"><span class="k">${hashing ? 'Comparing contents' : 'Files scanned'}</span><span class="v num">${hashing ? Math.round(ratio) + '%' : num(e.files)}</span></div><div class="stat"><span class="k">Scanned size</span><span class="v num">${bytes(e.bytes)}</span></div></div>
+  el.innerHTML = `<div class="row" style="gap:28px;margin-bottom:8px"><div class="stat"><span class="k">${t(hashing ? 'duplicates.comparing' : 'duplicates.filesScanned')}</span><span class="v num">${hashing ? Math.round(ratio) + '%' : num(e.files)}</span></div><div class="stat"><span class="k">${t('duplicates.scannedSize')}</span><span class="v num">${bytes(e.bytes)}</span></div></div>
     <div class="faint truncate mono" style="font-size:11.5px">${String(e.current || '').replace(/[<>&]/g, '')}</div>
     <div class="progress ${ratio == null ? 'indeterminate' : ''}" style="margin-top:14px"><div style="width:${ratio ?? 0}%"></div></div>`;
 });
@@ -34,7 +35,9 @@ function matchGroup(g, skip) {
 const SORTS = {wasted: (a, b) => b.size * (b.files.length - 1) - a.size * (a.files.length - 1), size: (a, b) => b.size - a.size, copies: (a, b) => b.files.length - a.files.length};
 const shownGroups = () => s.result.groups.map((g, idx) => ({...g, idx})).filter(g => matchGroup(g)).sort(SORTS[uf.sort]);
 
-const SIZES = [[100 * 1024, '100 KB'], [1024 * 1024, '1 MB'], [10 * 1024 * 1024, '10 MB'], [100 * 1024 * 1024, '100 MB']];
+const SIZES = [100 * 1024, 1024 * 1024, 10 * 1024 * 1024, 100 * 1024 * 1024];
+// Where the search ran: a folder or drive path, or all drives (s.root is null then; older saves stored 'all drives').
+const allDrives = () => s.roots?.length > 1 || s.root === 'all drives';
 
 function autoSelect(mode) {
   s.selected.clear();
@@ -50,70 +53,70 @@ function autoSelect(mode) {
 
 async function start(page, root) {
   const roots = Array.isArray(root) ? root : [root];
-  s.root = Array.isArray(root) ? 'all drives' : root; s.roots = roots; s.phase = 'running'; s.result = null; s.selected.clear(); s.limit = 100; page.update();
+  s.root = Array.isArray(root) ? (root.length === 1 ? root[0] : null) : root; s.roots = roots; s.phase = 'running'; s.result = null; s.selected.clear(); s.limit = 100; page.update();
   try { s.result = await api('disk.duplicates', {roots, minSize: s.minSize}); s.phase = 'done'; s.restored = false; autoSelect('newest'); persist(); }
-  catch (e) { s.phase = 'idle'; if (!/cancel/i.test(e.message)) throw e; }
+  catch (e) { s.phase = 'idle'; if (!/cancel|отмен/i.test(e.message)) throw e; }
   finally { page.update(); }
 }
 
 export default definePage({
-  id: 'duplicates', title: 'Duplicates', icon: 'copy',
+  id: 'duplicates', get title() { return t('page.duplicates'); }, icon: 'copy',
   view() {
     const head = html`<div class="page-head">
-      <div class="titles"><h1>Duplicate files</h1><p>Find identical files by content — not just by name. Aster keeps one copy of each and moves the rest to the ${TRASH_WORD}.</p></div>
-      ${s.result ? html`<div class="actions"><button class="btn btn-secondary" data-action="reset">${ic('folderOpen', 16)} New search</button></div>` : ''}
+      <div class="titles"><h1>${t('duplicates.heading')}</h1><p>${tb('duplicates.intro')}</p></div>
+      ${s.result ? html`<div class="actions"><button class="btn btn-secondary" data-action="reset">${ic('folderOpen', 16)} ${t('duplicates.newSearch')}</button></div>` : ''}
     </div>`;
-    if (s.phase === 'running') return html`${head}<div class="card card-pad"><div class="row" style="gap:14px;margin-bottom:18px"><div class="tile"><span class="spinner"></span></div><div class="grow"><div class="card-title">Searching ${s.root}</div><div class="muted">Files are compared by size first, then by content fingerprint.</div></div><button class="btn btn-secondary btn-sm" data-action="cancel">Cancel</button></div><div id="dupe-progress"><div class="skeleton" style="height:48px"></div></div></div>`;
+    if (s.phase === 'running') return html`${head}<div class="card card-pad"><div class="row" style="gap:14px;margin-bottom:18px"><div class="tile"><span class="spinner"></span></div><div class="grow"><div class="card-title">${allDrives() ? t('duplicates.searchingAll') : t('duplicates.searching', {root: s.root})}</div><div class="muted">${t('duplicates.searchingText')}</div></div><button class="btn btn-secondary btn-sm" data-action="cancel">${t('common.cancel')}</button></div><div id="dupe-progress"><div class="skeleton" style="height:48px"></div></div></div>`;
     if (!s.result) {
       const drives = app.system?.drives || [];
       return html`${head}
-        <div class="card card-pad" style="margin-bottom:16px"><div class="row" style="gap:14px;flex-wrap:wrap"><span style="font-weight:500">Ignore files smaller than</span>
-          <div class="segmented">${SIZES.map(([v, l]) => html`<button class="${s.minSize === v ? 'on' : ''}" data-action="min" data-v="${v}">${l}</button>`)}</div>
-          <span class="faint" style="font-size:12.5px">${isMac ? 'macOS, app bundles and Library folders are always skipped.' : 'Windows and program folders are always skipped.'}</span></div></div>
+        <div class="card card-pad" style="margin-bottom:16px"><div class="row" style="gap:14px;flex-wrap:wrap"><span style="font-weight:500">${t('duplicates.ignoreSmaller')}</span>
+          <div class="segmented">${SIZES.map(v => html`<button class="${s.minSize === v ? 'on' : ''}" data-action="min" data-v="${v}">${bytes(v)}</button>`)}</div>
+          <span class="faint" style="font-size:12.5px">${t(isMac ? 'duplicates.skippedMac' : 'duplicates.skipped')}</span></div></div>
         <div class="drive-picks">
-          ${drives.map(d => html`<button class="card drive-pick" data-action="go" data-root="${rootOf(d)}"><div class="row"><div class="tile blue">${ic('drive', 18)}</div><div><div style="font-weight:600">${d.label || 'Local Disk'} (${d.name})</div><div class="faint" style="font-size:12px">${bytes(d.total - d.free)} used</div></div></div></button>`)}
-          ${drives.length > 1 ? html`<button class="card drive-pick" data-action="goAll"><div class="row"><div class="tile">${ic('copy', 18)}</div><div><div style="font-weight:600">All drives</div><div class="faint" style="font-size:12px">Finds copies spread across ${drives.map(d => d.name).join(', ')}</div></div></div></button>` : ''}
-          <button class="card drive-pick" data-action="choose" style="justify-content:center;align-items:center;border-style:dashed"><div class="tile gray">${ic('folderOpen', 18)}</div><div style="font-weight:500">Choose a folder…</div></button>
+          ${drives.map(d => html`<button class="card drive-pick" data-action="go" data-root="${rootOf(d)}"><div class="row"><div class="tile blue">${ic('drive', 18)}</div><div><div style="font-weight:600">${d.label || t('disk.localDisk')} (${d.name})</div><div class="faint" style="font-size:12px">${t('duplicates.used', {size: bytes(d.total - d.free)})}</div></div></div></button>`)}
+          ${drives.length > 1 ? html`<button class="card drive-pick" data-action="goAll"><div class="row"><div class="tile">${ic('copy', 18)}</div><div><div style="font-weight:600">${t('duplicates.allDrives')}</div><div class="faint" style="font-size:12px">${t('duplicates.allDrivesText', {drives: drives.map(d => d.name).join(', ')})}</div></div></div></button>` : ''}
+          <button class="card drive-pick" data-action="choose" style="justify-content:center;align-items:center;border-style:dashed"><div class="tile gray">${ic('folderOpen', 18)}</div><div style="font-weight:500">${t('disk.chooseFolder')}</div></button>
         </div>`;
     }
     const all = s.result.groups;
     const groups = shownGroups();
     const filtered = groups.length !== all.length;
-    const note = s.restored ? previousScan(s.result.at, {label: 'Search again'}) : '';
-    if (!all.length) return html`${head}${note}<div class="card">${empty({iconName: 'check', title: 'No duplicates found', text: `Checked ${plural(s.result.files, 'file')} in ${s.root}.`})}</div>`;
+    const note = s.restored ? previousScan(s.result.at, {label: t('duplicates.searchAgain')}) : '';
+    if (!all.length) return html`${head}${note}<div class="card">${empty({iconName: 'check', title: t('duplicates.none'), text: allDrives() ? t('duplicates.checkedAll', {count: s.result.files}) : s.root ? t('duplicates.checkedIn', {count: s.result.files, root: s.root}) : t('duplicates.checkedPrevious', {count: s.result.files})})}</div>`;
     const selSize = all.reduce((n, g) => n + g.files.filter(f => s.selected.has(f.path)).length * g.size, 0);
     return html`${head}
       ${note}
       <div class="card cleaner-summary">
         <div class="tile amber" style="width:52px;height:52px;border-radius:14px">${ic('copy', 26)}</div>
-        <div class="grow"><div class="big num">${bytes(s.result.wasted)}</div><div class="label">taken by duplicates · ${plural(all.length, 'group')} in ${plural(s.result.files, 'scanned file')}</div></div>
-        <label class="fchip"><span class="fchip-k">Auto-select</span><span class="fchip-v">Choose which copy to keep</span>${ic('chevronDown', 13)}
-          <select data-change="autoSel"><option value="">Choose which copy to keep</option><option value="newest">Keep the newest copy</option><option value="oldest">Keep the oldest copy</option>${[...new Set(all.flatMap(drivesOf))].sort().map(d => html`<option value="drive:${d}">Keep the copy on drive ${d}</option>`)}<option value="none">Unselect everything</option></select></label>
+        <div class="grow"><div class="big num">${bytes(s.result.wasted)}</div><div class="label">${t('duplicates.takenBy')} · ${t('duplicates.groupsIn', {count: all.length, files: t('duplicates.scannedFiles', {count: s.result.files})})}</div></div>
+        <label class="fchip"><span class="fchip-k">${t('duplicates.autoSelect')}</span><span class="fchip-v">${t('duplicates.chooseKeep')}</span>${ic('chevronDown', 13)}
+          <select data-change="autoSel"><option value="">${t('duplicates.chooseKeep')}</option><option value="newest">${t('duplicates.keepNewest')}</option><option value="oldest">${t('duplicates.keepOldest')}</option>${[...new Set(all.flatMap(drivesOf))].sort().map(d => html`<option value="drive:${d}">${t('duplicates.keepOnDrive', {drive: d})}</option>`)}<option value="none">${t('duplicates.unselectAll')}</option></select></label>
       </div>
       <div class="toolbar filterbar" style="margin:12px 0 0">
-        ${searchBox(uf.search, 'Search file names or folders', 220)}
-        ${chip('drive', 'Drive', countOptions(all.filter(g => matchGroup(g, 'drive')).flatMap(g => drivesOf(g).map(d => ({d}))), x => x.d, {sort: 'alpha'}), uf.drive, {allLabel: 'All drives'})}
-        ${chip('type', 'File type', countOptions(all.filter(g => matchGroup(g, 'type')), g => extOf(g.files[0].path), {label: e => e === '(none)' ? 'No extension' : '.' + e}).slice(0, 30), uf.type)}
-        ${chip('spread', 'Copies are', [{value: 'same', label: 'On the same drive'}, {value: 'across', label: 'On different drives'}].map(o => ({...o, count: all.filter(g => matchGroup(g, 'spread') && (o.value === 'across') === (drivesOf(g).length > 1)).length})), uf.spread, {allLabel: 'Anywhere'})}
+        ${searchBox(uf.search, t('duplicates.search'), 220)}
+        ${chip('drive', t('duplicates.drive'), countOptions(all.filter(g => matchGroup(g, 'drive')).flatMap(g => drivesOf(g).map(d => ({d}))), x => x.d, {sort: 'alpha'}), uf.drive, {allLabel: t('duplicates.allDrives')})}
+        ${chip('type', t('disk.fileType'), countOptions(all.filter(g => matchGroup(g, 'type')), g => extOf(g.files[0].path), {label: e => e === '(none)' ? t('duplicates.noExtension') : '.' + e}).slice(0, 30), uf.type)}
+        ${chip('spread', t('duplicates.copiesAre'), [{value: 'same', label: t('duplicates.sameDrive')}, {value: 'across', label: t('duplicates.differentDrives')}].map(o => ({...o, count: all.filter(g => matchGroup(g, 'spread') && (o.value === 'across') === (drivesOf(g).length > 1)).length})), uf.spread, {allLabel: t('duplicates.anywhere')})}
         <span class="spacer"></span>
-        ${chip('sort', 'Sort', [{value: 'size', label: 'Largest file'}, {value: 'copies', label: 'Most copies'}], uf.sort === 'wasted' ? 'all' : uf.sort, {allLabel: 'Most space wasted'})}
+        ${chip('sort', t('duplicates.sort'), [{value: 'size', label: t('duplicates.sortSize')}, {value: 'copies', label: t('duplicates.sortCopies')}], uf.sort === 'wasted' ? 'all' : uf.sort, {allLabel: t('duplicates.sortWasted')})}
       </div>
-      ${filtered ? html`<div class="filter-result" style="padding:8px 2px 0"><span>Showing <strong>${num(groups.length)}</strong> of ${num(all.length)} groups</span><button class="linkish" data-action="clearFilters">Clear filters</button></div>` : ''}
+      ${filtered ? html`<div class="filter-result" style="padding:8px 2px 0"><span>${th('duplicates.showing', {shown: groups.length, total: all.length, count: all.length})}</span><button class="linkish" data-action="clearFilters">${t('filters.clear')}</button></div>` : ''}
       <div class="card" style="margin-top:12px">
-        ${!groups.length ? empty({iconName: 'search', title: 'No groups match', text: 'Try different filters.'}) : ''}
+        ${!groups.length ? empty({iconName: 'search', title: t('duplicates.noMatch'), text: t('duplicates.noMatchText')}) : ''}
         ${groups.slice(0, s.limit).map(g => html`<div class="dupe-group">
-          <div class="dupe-head"><span class="badge">${g.files.length} copies</span><span style="font-weight:600" class="num">${bytes(g.size)} each</span><span class="faint truncate grow">${baseName(g.files[0].path)}</span>${drivesOf(g).length > 1 ? html`<span class="badge blue">${drivesOf(g).join(' + ')}</span>` : ''}<span class="faint num" style="font-size:12px">${bytes(g.size * (g.files.length - 1))} reclaimable</span></div>
+          <div class="dupe-head"><span class="badge">${t('duplicates.copies', {count: g.files.length})}</span><span style="font-weight:600" class="num">${t('duplicates.each', {size: bytes(g.size)})}</span><span class="faint truncate grow">${baseName(g.files[0].path)}</span>${drivesOf(g).length > 1 ? html`<span class="badge blue">${drivesOf(g).join(' + ')}</span>` : ''}<span class="faint num" style="font-size:12px">${t('duplicates.reclaimable', {size: bytes(g.size * (g.files.length - 1))})}</span></div>
           ${g.files.map(f => html`<label class="dupe-file">
             ${checkbox(`data-change="pickFile" data-path="${f.path}" data-g="${g.idx}"`, s.selected.has(f.path))}
             <span class="drive-tag">${driveOf(f.path)}</span>
             <span class="p truncate grow selectable" title="${f.path}">${f.path}</span>
             <span class="faint num" style="font-size:12px;white-space:nowrap">${date(f.mtime)}</span>
-            <button class="icon-btn sm" data-action="reveal" data-path="${f.path}" title="${isMac ? 'Show in Finder' : 'Show in Explorer'}">${ic('external', 14)}</button>
+            <button class="icon-btn sm" data-action="reveal" data-path="${f.path}" title="${t(isMac ? 'disk.revealMac' : 'disk.reveal')}">${ic('external', 14)}</button>
           </label>`)}
         </div>`)}
-        ${groups.length > s.limit ? html`<div style="padding:12px 20px"><button class="btn btn-ghost btn-sm" data-action="more">Show more (${num(groups.length - s.limit)} groups)</button></div>` : ''}
+        ${groups.length > s.limit ? html`<div style="padding:12px 20px"><button class="btn btn-ghost btn-sm" data-action="more">${t('duplicates.showMore', {count: groups.length - s.limit})}</button></div>` : ''}
       </div>
-      ${s.selected.size ? html`<div class="selection-bar"><strong>${plural(s.selected.size, 'file')} selected</strong><span style="opacity:.7">${bytes(selSize)}</span><span class="spacer"></span><button class="btn btn-ghost btn-sm" data-action="auto" data-mode="none">Clear</button><button class="btn btn-danger btn-sm" data-action="trash">${ic('trash', 15)} Move to ${TRASH_WORD}</button></div>` : ''}`;
+      ${s.selected.size ? html`<div class="selection-bar"><strong>${t('duplicates.selected', {count: s.selected.size})}</strong><span style="opacity:.7">${bytes(selSize)}</span><span class="spacer"></span><button class="btn btn-ghost btn-sm" data-action="auto" data-mode="none">${t('disk.clear')}</button><button class="btn btn-danger btn-sm" data-action="trash">${ic('trash', 15)} ${tb('disk.moveTo')}</button></div>` : ''}`;
   },
   onMount() {
     // Bring back the last search (from before Aster was closed) the first time the page opens.
@@ -123,7 +126,7 @@ export default definePage({
       const d = saved?.data;
       if (!d || !Array.isArray(d.groups) || s.result || s.phase !== 'idle') return;
       s.result = {...d, at: d.at || saved.savedAt};
-      s.root = d.root || 'the previous location'; s.roots = Array.isArray(d.roots) ? d.roots : null;
+      s.root = d.root || null; s.roots = Array.isArray(d.roots) ? d.roots : null;
       if (d.minSize) s.minSize = d.minSize;
       s.phase = 'done'; s.restored = true; autoSelect('newest');
       if (this.mounted) this.update();
@@ -147,7 +150,7 @@ export default definePage({
       const g = s.result.groups[+el.dataset.g];
       if (el.checked && g.files.filter(f => f.path !== el.dataset.path).every(f => s.selected.has(f.path))) {
         el.checked = false;
-        toast('At least one copy in each group is always kept.', {type: 'info'});
+        toast(t('duplicates.oneKept'), {type: 'info'});
         return;
       }
       el.checked ? s.selected.add(el.dataset.path) : s.selected.delete(el.dataset.path);
@@ -155,7 +158,7 @@ export default definePage({
     },
     async trash() {
       const paths = [...s.selected];
-      const {ok} = await modal({title: `Move ${plural(paths.length, 'duplicate')} to the ${TRASH_WORD}?`, icon: 'trash', danger: true, confirm: `Move to ${TRASH_WORD}`, body: `One copy of every file is kept. Moved files can be restored from the ${TRASH_WORD}.`});
+      const {ok} = await modal({title: tb('duplicates.trashTitle', {count: paths.length}), icon: 'trash', danger: true, confirm: tb('disk.moveTo'), body: tb('duplicates.trashBody')});
       if (!ok) return;
       const r = await api('disk.trash', {paths});
       const gone = new Set(r.done);
@@ -163,7 +166,7 @@ export default definePage({
       s.result.wasted = s.result.groups.reduce((n, g) => n + g.size * (g.files.length - 1), 0);
       gone.forEach(p => s.selected.delete(p));
       persist();
-      toast(`Moved ${plural(r.done.length, 'file')} to the ${TRASH_WORD} · ${bytes(r.bytes)}`, {type: 'success'});
+      toast(tb('duplicates.moved', {count: r.done.length, size: bytes(r.bytes)}), {type: 'success'});
       this.update();
     }
   }

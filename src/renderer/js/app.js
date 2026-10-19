@@ -1,4 +1,5 @@
-import {html, str, ic, api, app, setApp, demo, fail, toast, modal, isMac} from './lib.js';
+import {html, str, ic, api, app, setApp, demo, fail, toast, modal, isMac, t, th} from './lib.js';
+import {setLanguage, onLanguageChange} from './i18n.js';
 import {logo} from './icons.js';
 import overview from './pages/overview.js';
 import cleaner from './pages/cleaner.js';
@@ -17,11 +18,11 @@ import wsettings from './pages/wsettings.js';
 const PAGES = [overview, cleaner, registry, optimize, startup, programs, updates, disk, duplicates, wsettings, tools, history, settings];
 const NAV = [
   {label: null, items: ['overview']},
-  {label: 'Clean', items: ['cleaner', 'registry']},
-  {label: 'Speed up', items: ['optimize', 'startup']},
-  {label: 'Manage', items: ['programs', 'updates']},
-  {label: 'Storage', items: ['disk', 'duplicates']},
-  {label: 'System', items: ['wsettings', 'tools', 'history']}
+  {label: 'nav.clean', items: ['cleaner', 'registry']},
+  {label: 'nav.speedUp', items: ['optimize', 'startup']},
+  {label: 'nav.manage', items: ['programs', 'updates']},
+  {label: 'nav.storage', items: ['disk', 'duplicates']},
+  {label: 'nav.system', items: ['wsettings', 'tools', 'history']}
 ];
 const byId = Object.fromEntries(PAGES.map(p => [p.id, p]));
 let current = null;
@@ -50,31 +51,31 @@ function show(id) {
 function navItem(id) {
   const p = byId[id];
   const badge = p.badge?.();
-  return html`<button class="nav-item ${current === p ? 'active' : ''}" data-nav="${id}">${ic(p.icon, 18)}<span>${p.title}</span>${badge ? html`<span class="badge ${badge.tone || ''}">${badge.text}</span>` : ''}</button>`;
+  return html`<button class="nav-item ${current === p ? 'active' : ''}" data-nav="${id}" title="${p.title}">${ic(p.icon, 18)}<span>${p.title}</span>${badge ? html`<span class="badge ${badge.tone || ''}">${badge.text}</span>` : ''}</button>`;
 }
 
 export function renderNav() {
   const nav = document.getElementById('nav');
   if (!nav) return;
-  nav.innerHTML = str(html`${NAV.map(g => html`<div class="nav-group">${g.label ? html`<div class="nav-label">${g.label}</div>` : ''}${g.items.map(navItem)}</div>`)}`);
+  nav.innerHTML = str(html`${NAV.map(g => html`<div class="nav-group">${g.label ? html`<div class="nav-label">${t(g.label)}</div>` : ''}${g.items.map(navItem)}</div>`)}`);
   const foot = document.getElementById('sidebar-foot');
   const s = app.system;
   foot.innerHTML = str(html`
-    ${isMac ? (s && s.fda === false ? html`<button class="admin-chip" data-relaunch style="cursor:pointer;text-align:left">${ic('lock', 18)}<div><strong>Limited access</strong><span class="faint">Allow Full Disk Access for Safari, Mail & Trash</span></div></button>`
-        : s ? html`<div class="admin-chip ok">${ic('shield', 18)}<div><strong>Full Disk Access</strong><span class="faint">Aster can clean everything</span></div></div>` : '')
-      : s && !s.admin ? html`<button class="admin-chip" data-relaunch style="cursor:pointer;text-align:left">${ic('shield', 18)}<div><strong>Standard mode</strong><span class="faint">Restart as admin for system areas</span></div></button>`
-      : s ? html`<div class="admin-chip ok">${ic('shield', 18)}<div><strong>Administrator</strong><span class="faint">Full access enabled</span></div></div>` : ''}
+    ${isMac ? (s && s.fda === false ? html`<button class="admin-chip" data-relaunch style="cursor:pointer;text-align:left">${ic('lock', 18)}<div><strong>${t('app.limitedAccess')}</strong><span class="faint">${t('app.limitedAccessHint')}</span></div></button>`
+        : s ? html`<div class="admin-chip ok">${ic('shield', 18)}<div><strong>${t('app.fullDiskAccess')}</strong><span class="faint">${t('app.fullDiskAccessHint')}</span></div></div>` : '')
+      : s && !s.admin ? html`<button class="admin-chip" data-relaunch style="cursor:pointer;text-align:left">${ic('shield', 18)}<div><strong>${t('app.standardMode')}</strong><span class="faint">${t('app.standardModeHint')}</span></div></button>`
+      : s ? html`<div class="admin-chip ok">${ic('shield', 18)}<div><strong>${t('app.administrator')}</strong><span class="faint">${t('app.administratorHint')}</span></div></div>` : ''}
     ${navItem('settings')}`);
 }
 window.asterRenderNav = renderNav;
 
 export async function relaunchAsAdmin() {
   if (isMac) {
-    const {ok} = await modal({title: 'Allow Full Disk Access?', icon: 'lock', confirm: 'Open System Settings', body: html`<p>macOS protects some folders — Safari, Mail, the Trash and other apps’ data — even from you. To clean them, allow Aster in <strong>System Settings → Privacy & Security → Full Disk Access</strong>.</p><ol style="margin:10px 0 0;padding-left:18px"><li>Click the <strong>+</strong> button (or switch on Aster if it is listed).</li><li>Choose Aster from Applications.</li><li>Quit and reopen Aster.</li></ol><p class="faint" style="margin-top:10px">Aster never reads your documents or messages; access is only used for cleaning.</p>`});
+    const {ok} = await modal({title: t('app.fdaTitle'), icon: 'lock', confirm: t('app.fdaConfirm'), body: th('app.fdaBody')});
     if (ok) api('system.openFullDiskAccess');
     return;
   }
-  const {ok} = await modal({title: 'Restart as administrator?', icon: 'shield', body: 'Aster will close and reopen with administrator rights so it can clean system folders, fix machine-wide registry entries and manage services. Windows will ask for permission.', confirm: 'Restart'});
+  const {ok} = await modal({title: t('app.adminTitle'), icon: 'shield', body: t('app.adminBody'), confirm: t('app.adminConfirm')});
   if (!ok) return;
   try { await api('system.relaunchAdmin'); } catch (e) { fail(e); }
 }
@@ -86,6 +87,22 @@ export function applyTheme(theme) {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 window.asterApplyTheme = applyTheme;
+
+// Static text of the window frame; pages render their own text.
+function paintChrome() {
+  const banner = document.getElementById('demo-banner');
+  if (banner) banner.textContent = t('app.demoBanner');
+  if (current) document.getElementById('crumb').textContent = current.title;
+}
+
+// Switching the language re-renders everything at once: the frame, the sidebar and the current page.
+// Cached data from the main process (rules, categories, tweaks…) is reset by its owners through onLanguageChange,
+// and the page is mounted again so it reloads that data in the new language.
+onLanguageChange(() => {
+  paintChrome();
+  renderNav();
+  if (current) { const page = current; page.unmount(); page.mount(document.getElementById('page')); }
+});
 
 async function boot() {
   document.getElementById('app').innerHTML = str(html`
@@ -100,19 +117,22 @@ async function boot() {
         <main class="content" id="main"><div class="page" id="page"></div></main>
       </div>
     </div>
-    ${demo ? html`<div class="demo-banner">Preview mode · sample data, no changes are made</div>` : ''}`);
+    ${demo ? html`<div class="demo-banner" id="demo-banner"></div>` : ''}`);
   document.getElementById('logo').innerHTML = logo(28);
   document.querySelector('.sidebar').addEventListener('click', e => {
     const n = e.target.closest('[data-nav]');
     if (n) navigate(n.dataset.nav);
     if (e.target.closest('[data-relaunch]')) relaunchAsAdmin();
   });
+  paintChrome();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(app.settings?.theme || 'system'));
   window.addEventListener('hashchange', () => show(location.hash.replace('#/', '')));
   app.listeners.add(renderNav);
 
   try {
     const [settingsData, info] = await Promise.all([api('settings.get'), api('app.info')]);
+    setLanguage(settingsData.language);
+    paintChrome();
     setApp({settings: settingsData, info});
     applyTheme(settingsData.theme);
     document.getElementById('brand-tag').textContent = String(info.version || '').split('.').slice(0, 2).join('.');

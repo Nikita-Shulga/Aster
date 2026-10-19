@@ -3,6 +3,7 @@ const {Worker} = require('node:worker_threads');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const {t} = require('./i18n.cjs');
 
 class Disk {
   constructor({store, trash, cache = null}) { this.store = store; this.trash = trash; this.cache = cache; this.worker = null; this.analysis = null; this.summary = null; this.dupes = null; this.saveTimer = null; }
@@ -65,7 +66,7 @@ class Disk {
 
   async children({path: p}) {
     const node = this.node(p);
-    if (!node) throw new Error('Analyze this location again.');
+    if (!node) throw new Error(t('disk.analyzeAgain'));
     const dir = path.resolve(p);
     const dirs = (node.c || []).map(c => ({name: c.n, path: path.join(dir, c.n), size: c.s, files: c.f, dir: true, hasChildren: !!c.c}));
     let files = [];
@@ -99,7 +100,7 @@ class Disk {
         this.subtract(p, size);
       } catch (e) { failed.push({path: p, error: e.message}); }
     }
-    if (done.length) this.store.log({kind: 'trash', title: `Moved ${done.length} item${done.length === 1 ? '' : 's'} to the Recycle Bin`, bytes, count: done.length});
+    if (done.length) this.store.log({kind: 'trash', key: 'activity.trashedItems', vars: {count: done.length}, bytes, count: done.length});
     if (done.length && this.summary) {
       const gone = done.map(p => path.resolve(p).toLowerCase());
       const inside = f => gone.some(g => { const p = path.resolve(f).toLowerCase(); return p === g || p.startsWith(g + path.sep); });
@@ -128,10 +129,10 @@ class Disk {
 }
 
 function checkRoot(root) {
-  if (typeof root !== 'string') throw new Error('Choose a folder or drive.');
+  if (typeof root !== 'string') throw new Error(t('disk.chooseFolderOrDrive'));
   if (/^[a-z]:$/i.test(root)) root += '\\';
-  if (!path.isAbsolute(root)) throw new Error('Choose a folder or drive.');
-  if (!fs.existsSync(root)) throw new Error('This location does not exist.');
+  if (!path.isAbsolute(root)) throw new Error(t('disk.chooseFolderOrDrive'));
+  if (!fs.existsSync(root)) throw new Error(t('disk.locationMissing'));
   return path.resolve(root);
 }
 

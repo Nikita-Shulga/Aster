@@ -2,6 +2,7 @@
 const {spawn} = require('node:child_process');
 const {powershell, run, sys32, SYSTEM_ROOT} = require('./ps.cjs');
 const path = require('node:path');
+const {t, td} = require('./i18n.cjs');
 
 // Fixed launch targets only; the renderer passes an id, never a command.
 const LAUNCH = {
@@ -44,10 +45,20 @@ const CATALOG = {
 class Tools {
   constructor({store, shell}) { this.store = store; this.shell = shell; }
 
-  catalog() { return CATALOG; }
+  // Titles and names are written in English above and translated here, in the current language.
+  catalog() {
+    // "System Information" is a different app on macOS with its own Russian name, so the Windows one has a key.
+    const names = list => list.map(([id, label, icon]) => [id, id === 'msinfo' ? t('tools.msinfo') : td(label), icon]);
+    return {
+      actions: CATALOG.actions.map(a => ({...a, title: td(a.title), text: td(a.text)})),
+      launchers: names(CATALOG.launchers),
+      settings: names(CATALOG.settings),
+      binRule: CATALOG.binRule
+    };
+  }
   async run({id}) {
-    if (id === 'restore') { await this.restorePoint({description: 'Aster checkpoint'}); return {ok: true, message: 'Restore point created'}; }
-    if (id === 'dns') { await this.flushDns(); return {ok: true, message: 'DNS cache flushed'}; }
+    if (id === 'restore') { await this.restorePoint({description: 'Aster checkpoint'}); return {ok: true, message: td('Restore point created')}; }
+    if (id === 'dns') { await this.flushDns(); return {ok: true, message: td('DNS cache flushed')}; }
     throw new Error('Unknown action');
   }
 
@@ -63,7 +74,7 @@ class Tools {
 
   async flushDns() {
     await run(sys32('ipconfig.exe'), ['/flushdns'], {timeout: 20000});
-    this.store.log({kind: 'tool', title: 'Flushed DNS cache'});
+    this.store.log({kind: 'tool', key: 'activity.dnsFlushed'});
     return {ok: true};
   }
 
@@ -76,14 +87,14 @@ Set-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -Value 0 -
 try { Checkpoint-Computer -Description ([string]$in.description) -RestorePointType 'MODIFY_SETTINGS' }
 finally { if ($null -eq $old) { Remove-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue } else { Set-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -Value $old -Type DWord } }
 Out-Json ([pscustomobject]@{ ok = $true })`;
-    try { await powershell(script, {input: {description: String(description).slice(0, 200)}, timeout: 300000}); }
+    try { await powershell(script, {input: {description: String(td(description)).slice(0, 200)}, timeout: 300000}); }
     catch (e) {
       const m = e.message || '';
       if (/access|denied|administrator/i.test(m)) throw new Error('Creating a restore point requires administrator rights.');
       if (/disabled|service cannot be started/i.test(m)) throw new Error('System Protection is turned off for your system drive. Enable it in System Properties → System Protection.');
       throw e;
     }
-    this.store.log({kind: 'tool', title: 'Created a system restore point'});
+    this.store.log({kind: 'tool', key: 'activity.restorePoint'});
     return {ok: true};
   }
 }

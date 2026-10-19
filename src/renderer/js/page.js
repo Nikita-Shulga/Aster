@@ -2,9 +2,10 @@ import {str, fixIndeterminate, fail} from './lib.js';
 
 // Minimal page runtime: a view() that returns html, and delegated handlers
 // wired through data-action / data-change / data-input attributes.
+// Getters in def (such as a translated title) stay live, so they follow the interface language.
 export function definePage(def) {
-  const page = {
-    ...def,
+  const page = Object.defineProperties({}, Object.getOwnPropertyDescriptors(def));
+  Object.assign(page, {
     el: null,
     mounted: false,
     mount(el) {
@@ -43,6 +44,6 @@ export function definePage(def) {
       if (target.tagName === 'A' || (kind === 'action' && target.type === 'submit')) e.preventDefault();
       Promise.resolve(fn.call(this, target, e)).catch(fail);
     }
-  };
+  });
   return page;
 }

@@ -1,4 +1,5 @@
-import {api, app, setApp, onEvent} from './lib.js';
+import {api, app, setApp, onEvent, t} from './lib.js';
+import {onLanguageChange} from './i18n.js';
 
 // Results shared between Overview (Smart Scan) and the individual tools.
 export const shared = {
@@ -9,6 +10,21 @@ export const shared = {
   listeners: new Set()
 };
 export const notify = () => { shared.listeners.forEach(fn => fn()); window.asterRenderNav?.(); };
+
+// Rules and categories carry text from the main process in the interface language: drop them so they are
+// fetched again, keeping the user's selection and results. Location names in the cleaner results are renamed too.
+onLanguageChange(async () => {
+  const c = shared.cleaner, r = shared.registry;
+  c.rules = null; c.groups = null;
+  r.categories = null;
+  if (c.analysis) {
+    const renamed = await api('cleaner.relabel', {analysis: c.analysis}).catch(() => null);
+    if (renamed && c.analysis) { c.analysis.results = renamed.results; notify(); }
+  }
+  await loadRules().catch(() => {});
+  await loadRegistryCategories().catch(() => {});
+  notify();
+});
 
 onEvent(e => {
   if (e.channel === 'cleaner' && (shared.cleaner.phase === 'analyzing' || shared.cleaner.phase === 'cleaning')) {
@@ -22,6 +38,7 @@ export async function loadRules() {
   if (c.rules) return c;
   const {rules, groups} = await api('cleaner.rules');
   c.rules = rules; c.groups = groups;
+  if (c.selected) return c;
   const saved = app.settings?.cleanerSelection;
   c.selected = new Set(Array.isArray(saved) ? saved.filter(id => rules.some(r => r.id === id)) : rules.filter(r => r.defaultOn).map(r => r.id));
   return c;
@@ -59,7 +76,7 @@ export async function restoreCleaner() {
 export async function analyzeCleaner() {
   const c = await loadRules();
   const ids = c.rules.filter(r => c.selected.has(r.id) && usableRule(r)).map(r => r.id);
-  c.phase = 'analyzing'; c.analysis = null; c.lastClean = null; c.restored = false; c.progress = {index: 0, total: ids.length, label: 'Preparing…'}; notify();
+  c.phase = 'analyzing'; c.analysis = null; c.lastClean = null; c.restored = false; c.progress = {index: 0, total: ids.length, label: t('cleaner.preparing')}; notify();
   try {
     c.analysis = {...await api('cleaner.analyze', {ids}), at: new Date().toISOString()};
     c.phase = 'analyzed';
@@ -72,6 +89,7 @@ export async function loadRegistryCategories() {
   const r = shared.registry;
   if (r.categories) return r;
   r.categories = await api('registry.categories');
+  if (r.selected) return r;
   const saved = app.settings?.registryCategories;
   r.selected = new Set(Array.isArray(saved) ? saved : r.categories.map(c => c.id));
   r.defaults = new Set(r.categories.filter(c => c.defaultOn).map(c => c.id));

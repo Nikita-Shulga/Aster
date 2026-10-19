@@ -3,6 +3,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 const {sh, rootVolumeName, hasFullDiskAccess} = require('./sh.cjs');
+const {td} = require('../i18n.cjs');
 
 const NAMES = {26: 'Tahoe', 15: 'Sequoia', 14: 'Sonoma', 13: 'Ventura', 12: 'Monterey', 11: 'Big Sur'};
 let cached = null;
@@ -92,7 +93,7 @@ async function info({refresh = false} = {}) {
       drives: volumes()
     };
   }
-  return {...cached, drives: volumes(), fda: hasFullDiskAccess(), memory: await memory(), uptime: os.uptime(), cpuLoad: cpuLoad()};
+  return {...cached, cpu: td(cached.cpu), drives: volumes(), fda: hasFullDiskAccess(), memory: await memory(), uptime: os.uptime(), cpuLoad: cpuLoad()};
 }
 
 async function live() { return {memory: await memory(), cpuLoad: cpuLoad(), uptime: os.uptime()}; }

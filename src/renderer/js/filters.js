@@ -1,4 +1,5 @@
-import {html, ic, app, isMac} from './lib.js';
+import {html, ic, app, isMac, t, th} from './lib.js';
+import {locale} from './i18n.js';
 
 // Compact filter chips used across pages. Each chip is a native <select> (keyboard-friendly)
 // styled as a pill; options show how many items they would match.
@@ -16,15 +17,15 @@ export const baseName = p => String(p || '').split(/[\\/]/).filter(Boolean).pop(
 export const dirName = p => { const s = String(p || ''); const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\')); return i > 0 ? s.slice(0, i) : (isMac ? '/' : s); };
 
 // Build options with counts from a list. getter returns a value (or null for "unknown").
-export function countOptions(items, getter, {label = v => v, unknown = 'Unknown', sort = 'count'} = {}) {
+export function countOptions(items, getter, {label = v => v, unknown = t('filters.unknown'), sort = 'count'} = {}) {
   const counts = new Map();
   for (const it of items) { const v = getter(it) ?? '__none'; counts.set(v, (counts.get(v) || 0) + 1); }
   const opts = [...counts.entries()].map(([value, count]) => ({value, label: value === '__none' ? unknown : label(value), count}));
-  opts.sort(sort === 'alpha' ? (a, b) => String(a.label).localeCompare(String(b.label)) : (a, b) => b.count - a.count || String(a.label).localeCompare(String(b.label)));
+  opts.sort(sort === 'alpha' ? (a, b) => String(a.label).localeCompare(String(b.label), locale()) : (a, b) => b.count - a.count || String(a.label).localeCompare(String(b.label), locale()));
   return opts;
 }
 
-export function chip(key, label, options, value, {allLabel = 'All'} = {}) {
+export function chip(key, label, options, value, {allLabel = t('filters.all')} = {}) {
   const active = value !== 'all';
   const current = options.find(o => String(o.value) === String(value));
   return html`<label class="fchip ${active ? 'on' : ''}" title="${label}">
@@ -39,14 +40,14 @@ export function chip(key, label, options, value, {allLabel = 'All'} = {}) {
 }
 
 export function search(value, placeholder, width = 240) {
-  return html`<div class="search">${ic('search', 16)}<input class="input" style="width:${width}px" data-key="search" data-input="search" placeholder="${placeholder}" value="${value || ''}">${value ? html`<button class="search-clear" data-action="clearSearch" title="Clear search">${ic('x', 13)}</button>` : ''}</div>`;
+  return html`<div class="search">${ic('search', 16)}<input class="input" style="width:${width}px" data-key="search" data-input="search" placeholder="${placeholder}" value="${value || ''}">${value ? html`<button class="search-clear" data-action="clearSearch" title="${t('filters.clearSearch')}">${ic('x', 13)}</button>` : ''}</div>`;
 }
 
-// "Showing 12 of 136 · Clear filters"
-export function resultLine(shown, total, f, noun = 'items') {
+// "Showing 12 of 136 items · Clear filters". key names the sentence for the kind of item, with {shown} and {total}.
+export function resultLine(shown, total, f, key = 'filters.showingItems') {
   const active = Object.entries(f).some(([k, v]) => k !== 'sort' && v && v !== 'all');
   if (!active) return '';
-  return html`<div class="filter-result"><span>Showing <strong>${shown}</strong> of ${total} ${noun}</span><button class="linkish" data-action="clearFilters">Clear filters</button></div>`;
+  return html`<div class="filter-result"><span>${th(key, {shown, total, count: total})}</span><button class="linkish" data-action="clearFilters">${t('filters.clear')}</button></div>`;
 }
 
 // Mixin handlers: pages spread these into their `on` map. State lives in page.filters.
@@ -59,18 +60,20 @@ export function filterHandlers(getState, defaults) {
   };
 }
 
+// Labels are getters so they follow the interface language.
+const bucket = (value, test) => ({value, test, get label() { return t(`filters.bucket.${value}`); }});
 export const SIZE_BUCKETS = [
-  {value: 'huge', label: 'Over 1 GB', test: b => b >= 1024 ** 3},
-  {value: 'large', label: '100 MB – 1 GB', test: b => b >= 100 * 1024 ** 2 && b < 1024 ** 3},
-  {value: 'medium', label: '10 – 100 MB', test: b => b >= 10 * 1024 ** 2 && b < 100 * 1024 ** 2},
-  {value: 'small', label: 'Under 10 MB', test: b => b < 10 * 1024 ** 2}
+  bucket('huge', b => b >= 1024 ** 3),
+  bucket('large', b => b >= 100 * 1024 ** 2 && b < 1024 ** 3),
+  bucket('medium', b => b >= 10 * 1024 ** 2 && b < 100 * 1024 ** 2),
+  bucket('small', b => b < 10 * 1024 ** 2)
 ];
 export const AGE_BUCKETS = [
-  {value: 'week', label: 'Last 7 days', test: d => d <= 7},
-  {value: 'month', label: 'Last 30 days', test: d => d <= 30},
-  {value: 'year', label: 'Last 12 months', test: d => d <= 365},
-  {value: 'old', label: 'Over a year ago', test: d => d > 365},
-  {value: 'veryold', label: 'Over 2 years ago', test: d => d > 730}
+  bucket('week', d => d <= 7),
+  bucket('month', d => d <= 30),
+  bucket('year', d => d <= 365),
+  bucket('old', d => d > 365),
+  bucket('veryold', d => d > 730)
 ];
 export const daysSince = t => { const ms = typeof t === 'number' ? t : Date.parse(t); return Number.isFinite(ms) ? (Date.now() - ms) / 864e5 : null; };
 export const bucketTest = (buckets, value, x) => value === 'all' || (x != null && buckets.find(b => b.value === value)?.test(x));

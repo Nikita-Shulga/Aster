@@ -4,6 +4,7 @@
 // PowerShell snippets are fixed source; the only dynamic input is the desired value ($v) passed as JSON.
 const fs = require('node:fs');
 const {psJson, arr, run, sys32} = require('./ps.cjs');
+const {td} = require('./i18n.cjs');
 
 const HELPERS = String.raw`
 function RegGet($p, $n, $d = $null) { try { $x = (Get-ItemProperty -LiteralPath $p -Name $n -ErrorAction Stop).$n; if ($null -eq $x) { $d } else { $x } } catch { $d } }
@@ -196,6 +197,9 @@ const GROUPS = {
   performance: 'Performance', gaming: 'Gaming', privacy: 'Privacy & ads',
   appearance: 'Appearance', explorer: 'File Explorer', taskbar: 'Taskbar & input'
 };
+// Text leaves in the interface language; TWEAKS and GROUPS stay English (History stores English and translates on display).
+const translatedGroups = () => Object.fromEntries(Object.entries(GROUPS).map(([k, v]) => [k, td(v)]));
+const translatedOptions = options => options ? options.map(o => ({...o, label: td(o.label)})) : null;
 
 function script(ids, action) {
   const pick = T.filter(t => ids.includes(t.id));
@@ -238,9 +242,9 @@ class Tweaks {
     const defs = T.filter(t => groups.includes(t.group) && (!t.win11 || build >= 22000));
     const values = await psJson(script(defs.map(t => t.id), 'get'), null, {timeout: 60000});
     const hiberBytes = Number.isFinite(values?.__hiber) ? values.__hiber : null;
-    return {groups: GROUPS, items: defs.map(t => ({
-      id: t.id, group: t.group, title: t.title, type: t.type, what: t.what, pro: t.pro || null, con: t.con || null,
-      on: t.on || null, off: t.off || null, options: t.options || null, recommended: t.recommended, verdict: t.verdict,
+    return {groups: translatedGroups(), items: defs.map(t => ({
+      id: t.id, group: t.group, title: td(t.title), type: t.type, what: td(t.what), pro: td(t.pro) || null, con: td(t.con) || null,
+      on: td(t.on) || null, off: td(t.off) || null, options: translatedOptions(t.options), recommended: t.recommended, verdict: t.verdict,
       admin: !!t.admin, restart: t.restart || null, value: values?.[t.id] ?? null,
       extra: t.id === 'hibernation' && hiberBytes ? {bytes: hiberBytes} : null
     }))};
@@ -256,7 +260,7 @@ class Tweaks {
     catch (e) { throw /access|denied|unauthori|administrator|privilege/i.test(e.message) ? new Error('This change needs administrator rights. Use "Restart as administrator".') : e; }
     const after = (await psJson(script([id], 'get')))?.[id];
     const label = v => t.type === 'toggle' ? (v ? t.on : t.off) : t.options.find(o => o.value === v)?.label ?? String(v);
-    this.store.log({kind: 'tweak', title: `${t.title}: ${label(before)} → ${label(after)}`});
+    this.store.log({kind: 'tweak', key: 'activity.tweak', vars: {title: t.title, before: label(before), after: label(after)}, title: `${t.title}: ${label(before)} → ${label(after)}`});
     return {ok: true, value: after};
   }
 
@@ -269,14 +273,14 @@ class Tweaks {
     if (guid) {
       if (!/^[0-9a-f-]{36}$/i.test(guid)) throw new Error('Invalid plan');
       await pc('/setactive', guid);
-      this.store.log({kind: 'tweak', title: 'Changed power plan'});
+      this.store.log({kind: 'tweak', key: 'activity.powerPlan'});
     }
     for (const [key, val] of [['monitor', screen], ['standby', sleep]]) {
       if (val == null) continue;
       const min = Math.max(0, Math.min(600, Math.round(Number(val))));
       await pc('/change', `${key}-timeout-ac`, String(min));
       await pc('/change', `${key}-timeout-dc`, String(min));
-      this.store.log({kind: 'tweak', title: `${key === 'monitor' ? 'Turn off screen' : 'Sleep'} after: ${min ? min + ' min' : 'never'}`});
+      this.store.log({kind: 'tweak', key: `activity.${key === 'monitor' ? 'screen' : 'sleep'}${min ? 'After' : 'Never'}`, vars: {count: min}});
     }
     return this.power();
   }
@@ -285,7 +289,7 @@ class Tweaks {
     const out = await run(sys32('powercfg.exe'), ['-duplicatescheme', '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'], {timeout: 20000});
     const guid = (String(out).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0];
     if (guid) await run(sys32('powercfg.exe'), ['/setactive', guid], {timeout: 20000});
-    this.store.log({kind: 'tweak', title: 'Added and activated the High performance power plan'});
+    this.store.log({kind: 'tweak', key: 'activity.highPerformance'});
     return this.power();
   }
 
@@ -296,7 +300,7 @@ class Tweaks {
     const p = list.find(x => x.name === name);
     if (!p || p.protected) throw new Error('This process is part of Windows and cannot be closed by Aster.');
     await run(sys32('taskkill.exe'), ['/IM', `${name}.exe`, '/T'], {timeout: 20000}).catch(() => run(sys32('taskkill.exe'), ['/IM', `${name}.exe`, '/T', '/F'], {timeout: 20000}));
-    this.store.log({kind: 'tool', title: `Closed ${p.description || name}`});
+    this.store.log({kind: 'tool', key: 'activity.processClosed', vars: {name: p.description || name}});
     return {ok: true};
   }
 

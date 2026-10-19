@@ -7,6 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {sh, osa, asString, plist, mapLimit, HOME, LIB, volumeOf} = require('./sh.cjs');
 const {dirSize} = require('../programs.cjs');
+const {td} = require('../i18n.cjs');
 
 const ROOTS = ['/Applications', '/Applications/Utilities', path.join(HOME, 'Applications')];
 const SYSTEM_ROOTS = ['/System/Applications', '/System/Applications/Utilities'];
@@ -96,7 +97,7 @@ class MacPrograms {
     await new Promise(r => setTimeout(r, 1200));
     await this.moveToTrash(it.location);
     const removed = !fs.existsSync(it.location);
-    if (removed) this.store.log({kind: 'uninstall', title: `Moved ${it.name} to the Trash`});
+    if (removed) this.store.log({kind: 'uninstall', key: 'activity.macAppTrashed', vars: {name: it.name}});
     return {removed};
   }
 
@@ -131,10 +132,11 @@ class MacPrograms {
         found.push({kind: e.isDirectory() ? 'folder' : 'file', path: full, reason, size});
       }
     }
-    if (fs.existsSync(it.location)) found.unshift({kind: 'folder', path: it.location, reason: 'Install folder', size: it.size || 0});
+    if (fs.existsSync(it.location)) found.unshift({kind: 'folder', path: it.location, reason: 'Install folder', install: true, size: it.size || 0});
     const items = found.map(x => ({...x, id: crypto.createHash('sha1').update(x.path).digest('hex').slice(0, 16)}));
     this.leftovers.set(id, new Map(items.map(x => [x.id, x])));
-    return {program: it, items};
+    // Reasons are kept in English and shown in the interface language; "install" marks the app bundle itself.
+    return {program: it, items: items.map(x => ({...x, reason: td(x.reason)}))};
   }
 
   async removeLeftovers({programId, ids}) {
@@ -144,7 +146,8 @@ class MacPrograms {
     for (const x of (ids || []).map(i => map.get(i)).filter(Boolean)) {
       try { await this.moveToTrash(x.path); removed++; bytes += x.size || 0; } catch (e) { failed.push({path: x.path, error: e.message}); }
     }
-    this.store.log({kind: 'leftovers', title: `Moved ${removed} leftover${removed === 1 ? '' : 's'} of ${this.items.get(programId)?.name || 'an app'} to the Trash`, count: removed, bytes});
+    const appName = this.items.get(programId)?.name;
+    this.store.log({kind: 'leftovers', key: appName ? 'activity.macLeftoversOf' : 'activity.macLeftoversOfApp', vars: {count: removed, name: appName}, count: removed, bytes});
     return {removed, failed, bytes, backup: null};
   }
 }

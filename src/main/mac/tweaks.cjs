@@ -3,6 +3,7 @@
 // a recommendation, and whether admin rights or a restart of Finder/Dock or sign-out is needed.
 const path = require('node:path');
 const {sh, osa, sudo, plist, mapLimit} = require('./sh.cjs');
+const {td} = require('../i18n.cjs');
 
 const D = '/usr/bin/defaults';
 async function read(domain, key) { try { return (await sh(D, ['read', domain, key], {timeout: 5000})).trim(); } catch { return null; } }
@@ -149,6 +150,9 @@ const T = [
 ];
 
 const GROUPS = {performance: 'Performance', privacy: 'Privacy', appearance: 'Appearance', explorer: 'Finder', taskbar: 'Dock', input: 'Keyboard & trackpad', screenshots: 'Screenshots'};
+// Text leaves in the interface language; TWEAKS and GROUPS stay English (History stores English and translates on display).
+const translatedGroups = () => Object.fromEntries(Object.entries(GROUPS).map(([k, v]) => [k, td(v)]));
+const translatedOptions = options => options ? options.map(o => ({...o, label: td(o.label)})) : null;
 
 const PROTECTED = /^(kernel_task|launchd|WindowServer|loginwindow|Dock|Finder|SystemUIServer|ControlCenter|coreaudiod|mds|mds_stores|mdworker|bluetoothd|cfprefsd|distnoted|Aster|Electron)$/;
 
@@ -158,7 +162,7 @@ class MacTweaks {
   async list({groups}) {
     const defs = T.filter(t => groups.includes(t.group));
     const values = await mapLimit(defs, 6, t => t.get().catch(() => null));
-    return {groups: GROUPS, items: defs.map((t, i) => ({id: t.id, group: t.group, title: t.title, type: t.type, what: t.what, pro: t.pro || null, con: t.con || null, on: t.on || null, off: t.off || null, options: t.options || null, recommended: t.recommended, verdict: t.verdict, admin: !!t.admin, restart: t.restart || null, value: values[i] ?? null, extra: null}))
+    return {groups: translatedGroups(), items: defs.map((t, i) => ({id: t.id, group: t.group, title: td(t.title), type: t.type, what: td(t.what), pro: td(t.pro) || null, con: td(t.con) || null, on: td(t.on) || null, off: td(t.off) || null, options: translatedOptions(t.options), recommended: t.recommended, verdict: t.verdict, admin: !!t.admin, restart: t.restart || null, value: values[i] ?? null, extra: null}))
       .filter(t => !(['lowPower', 'powerNap'].includes(t.id) && t.value === null))};
   }
 
@@ -171,7 +175,7 @@ class MacTweaks {
     await t.set(value);
     const after = await t.get().catch(() => value);
     const label = v => t.type === 'toggle' ? (v ? t.on : t.off) : t.options.find(o => o.value === v)?.label ?? String(v);
-    this.store.log({kind: 'tweak', title: `${t.title}: ${label(before)} → ${label(after)}`});
+    this.store.log({kind: 'tweak', key: 'activity.tweak', vars: {title: t.title, before: label(before), after: label(after)}, title: `${t.title}: ${label(before)} → ${label(after)}`});
     return {ok: true, value: after};
   }
 
@@ -187,7 +191,7 @@ class MacTweaks {
       if (val == null) continue;
       const min = Math.max(0, Math.min(600, Math.round(Number(val))));
       await sudo(`/usr/bin/pmset -a ${key} ${min}`);
-      this.store.log({kind: 'tweak', title: `${key === 'displaysleep' ? 'Turn off display' : 'Sleep'} after: ${min ? min + ' min' : 'never'}`});
+      this.store.log({kind: 'tweak', key: `activity.${key === 'displaysleep' ? 'display' : 'sleep'}${min ? 'After' : 'Never'}`, vars: {count: min}});
     }
     return this.power();
   }
@@ -215,7 +219,7 @@ class MacTweaks {
   async endProcess({name}) {
     if (typeof name !== 'string' || !/^[\w .+()-]{1,100}$/.test(name) || PROTECTED.test(name)) throw new Error('This process is part of macOS and cannot be closed by Aster.');
     await osa(`tell application "${name.replace(/"/g, '')}" to quit`, {timeout: 20000});
-    this.store.log({kind: 'tool', title: `Quit ${name}`});
+    this.store.log({kind: 'tool', key: 'activity.appQuit', vars: {name}});
     return {ok: true};
   }
 

@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const {spawn} = require('node:child_process');
 const {Readable, Transform} = require('node:stream');
 const {pipeline} = require('node:stream/promises');
+const {t} = require('./i18n.cjs');
 
 const REPO = 'Nikita-Shulga/Aster';
 const LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
@@ -88,7 +89,7 @@ class Updater {
     try { res = await this.fetch(LATEST, {headers: HEADERS, signal: AbortSignal.timeout(20000)}); }
     catch { throw new Error('Could not reach GitHub. Check your internet connection and try again.'); }
     if (res.status === 403 || res.status === 429) throw new Error('GitHub is limiting requests right now. Try again in a few minutes.');
-    if (!res.ok) throw new Error(`GitHub answered ${res.status}. Try again later.`);
+    if (!res.ok) throw new Error(t('updater.githubStatus', {status: String(res.status)}));
     const r = await res.json();
     const latest = String(r.tag_name || '').replace(/^v/i, '');
     if (!latest) throw new Error('GitHub returned a release without a version.');
@@ -125,14 +126,14 @@ class Updater {
     const file = path.join(dir, rel.asset.name);
     try {
       const sumsRes = await this.fetch(rel.sums.browser_download_url, {headers: {'User-Agent': HEADERS['User-Agent']}, signal});
-      if (!sumsRes.ok) throw new Error(`Could not download the checksums (${sumsRes.status}).`);
+      if (!sumsRes.ok) throw new Error(t('updater.sumsFailed', {status: String(sumsRes.status)}));
       const expected = parseSums(await sumsRes.text()).get(rel.asset.name);
-      if (!expected) throw new Error(`The checksums don't list ${rel.asset.name}.`);
+      if (!expected) throw new Error(t('updater.sumsMissing', {name: rel.asset.name}));
 
       try { fs.rmSync(dir, {recursive: true, force: true}); } catch {}
       fs.mkdirSync(dir, {recursive: true});
       const res = await this.fetch(rel.asset.browser_download_url, {headers: {'User-Agent': HEADERS['User-Agent']}, signal});
-      if (!res.ok || !res.body) throw new Error(`Download failed (${res.status}).`);
+      if (!res.ok || !res.body) throw new Error(t('updater.downloadFailed', {status: String(res.status)}));
       const total = Number(res.headers.get('content-length')) || rel.asset.size || 0;
       const hash = crypto.createHash('sha256');
       let done = 0, last = 0;
@@ -165,32 +166,32 @@ class Updater {
       child.on?.('error', () => {});
       child.unref?.();
     };
-    this.store?.log({kind: 'update', title: `Updating Aster to ${f.version}`});
+    this.store?.log({kind: 'update', key: 'activity.updatingAster', vars: {version: f.version}});
     if (kind === 'installer') {
       // Silent per-user install into the current folder, then relaunch (electron-builder NSIS flags).
       // NSIS wants /D= last and unquoted, so the command line is passed verbatim with a quoted program path.
       const dir = path.dirname(process.execPath);
       launch(f.path, ['/S', '--updated', '--force-run', `/D=${dir}`], {windowsVerbatimArguments: true, argv0: `"${f.path}"`});
       setTimeout(() => this.app.quit(), 400);
-      return {ok: true, restarting: true, message: `Installing Aster ${f.version}. Aster will reopen in a moment.`};
+      return {ok: true, restarting: true, message: t('updater.installing', {version: f.version})};
     }
     if (kind === 'portable') {
       const target = path.join(path.dirname(process.env.PORTABLE_EXECUTABLE_FILE), f.name);
       fs.copyFileSync(f.path, target);
       launch(target, []);
       setTimeout(() => this.app.quit(), 400);
-      return {ok: true, restarting: true, message: `Opening Aster ${f.version}. The new version was saved as ${f.name} next to the old one, which you can delete.`};
+      return {ok: true, restarting: true, message: t('updater.portableOpened', {version: f.version, name: f.name})};
     }
     if (kind === 'mac') {
       const target = path.join(this.app.getPath('downloads'), f.name);
       fs.copyFileSync(f.path, target);
       const err = await this.shell.openPath(target);
       if (err) throw new Error(err);
-      return {ok: true, restarting: false, message: `Aster ${f.version} is open in Finder. Quit Aster, drag the new Aster into Applications and choose Replace.`};
+      return {ok: true, restarting: false, message: t('updater.macOpened', {version: f.version})};
     }
     if (kind === 'manual') {
       launch(f.path, []);
-      return {ok: true, restarting: false, message: `The Aster ${f.version} installer is open. Follow its steps; it will close this copy of Aster.`};
+      return {ok: true, restarting: false, message: t('updater.installerOpened', {version: f.version})};
     }
     throw new Error('Updates can only be installed in the packaged app.');
   }

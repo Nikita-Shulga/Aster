@@ -48,7 +48,7 @@
 | 🧭 **Disk analyzer & duplicates** | Treemap of any drive, file types, the largest files — and for each one, *what it is, which program owns it and whether deleting it breaks anything*. Content-based duplicate finder across drives. |
 | 🔍 **Filters everywhere** | Drive, size, date, type, publisher, verdict, last opened… Every list can be narrowed down, and every option shows how many items it matches. |
 | ↩️ **Undo-friendly** | Your files go to the Recycle Bin / Trash, registry changes are backed up first, and **History** restores any backup in one click. |
-| 🌗 **Feels native** | Light and dark themes, native title bar and window controls, Full Disk Access guidance on Mac, works without admin rights. |
+| 🌗 **Feels native** | Light and dark themes, English or Russian interface (**Settings → Language**), native title bar and window controls, Full Disk Access guidance on Mac, works without admin rights. |
 
 ## Download
 

@@ -8,6 +8,8 @@ const {Cleaner} = require('./cleaner.cjs');
 const {Disk} = require('./disk.cjs');
 const {Updater} = require('./updater.cjs');
 const {ScanCache, pruneDuplicates} = require('./scans.cjs');
+const i18n = require('./i18n.cjs');
+const {t, tdLabel, tError} = i18n;
 
 // Platform layer: the same API on Windows and macOS, implemented natively for each.
 const isMac = process.platform === 'darwin';
@@ -111,14 +113,32 @@ function overlayColors(theme) {
   return dark ? {color: '#121215', symbolColor: '#e8e8ed', height: 44} : {color: '#f7f7f9', symbolColor: '#1d1d22', height: 44};
 }
 
+// macOS needs an application menu for Quit, Copy/Paste and window shortcuts. Electron names the standard
+// items in English, so in other languages the same items are listed with translated labels.
+function appMenu() {
+  if (!isMac) return null;
+  if (i18n.getLanguage() === 'en') return Menu.buildFromTemplate([{role: 'appMenu'}, {role: 'editMenu'}, {role: 'viewMenu', submenu: [{role: 'resetZoom'}, {role: 'zoomIn'}, {role: 'zoomOut'}, {type: 'separator'}, {role: 'togglefullscreen'}]}, {role: 'windowMenu'}]);
+  const name = app.name, sep = {type: 'separator'};
+  const item = (role, key, vars) => ({role, label: t(key, vars)});
+  return Menu.buildFromTemplate([
+    {label: name, submenu: [item('about', 'menu.about', {name}), sep, item('services', 'menu.services'), sep, item('hide', 'menu.hide', {name}), item('hideOthers', 'menu.hideOthers'), item('unhide', 'menu.showAll'), sep, item('quit', 'menu.quit', {name})]},
+    {label: t('menu.edit'), submenu: [item('undo', 'menu.undo'), item('redo', 'menu.redo'), sep, item('cut', 'menu.cut'), item('copy', 'menu.copy'), item('paste', 'menu.paste'), item('pasteAndMatchStyle', 'menu.pasteAndMatchStyle'), item('delete', 'menu.delete'), item('selectAll', 'menu.selectAll')]},
+    {label: t('menu.view'), submenu: [item('resetZoom', 'menu.resetZoom'), item('zoomIn', 'menu.zoomIn'), item('zoomOut', 'menu.zoomOut'), sep, item('togglefullscreen', 'menu.fullScreen')]},
+    {role: 'windowMenu', label: t('menu.window'), submenu: [item('minimize', 'menu.minimize'), item('zoom', 'menu.zoom'), sep, item('front', 'menu.front')]}
+  ]);
+}
+
+// Cleaner location names in the interface language. "key" keeps the English name so a saved analysis can be
+// renamed when the language changes (older saves have only the English label).
+const relabel = analysis => ({...analysis, results: (analysis?.results || []).map(r => ({...r, locations: (r.locations || []).map(l => ({...l, key: l.key ?? l.label, label: tdLabel(l.key ?? l.label)}))}))});
+
 async function main() {
   if (!(await acquireLock())) { app.quit(); return; }
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   await app.whenReady();
-  // macOS needs an application menu for Quit, Copy/Paste and window shortcuts.
-  Menu.setApplicationMenu(isMac ? Menu.buildFromTemplate([{role: 'appMenu'}, {role: 'editMenu'}, {role: 'viewMenu', submenu: [{role: 'resetZoom'}, {role: 'zoomIn'}, {role: 'zoomOut'}, {type: 'separator'}, {role: 'togglefullscreen'}]}, {role: 'windowMenu'}]) : null);
-
   const store = new Store(app.getPath('userData'));
+  i18n.setLanguage(store.getSettings().language);
+  Menu.setApplicationMenu(appMenu());
   let sysInfo = null;
   const getDrives = async () => (sysInfo || (sysInfo = await system.info())).drives;
   const cleaner = new Cleaner({getSettings: () => store.getSettings(), getDrives, trash});
@@ -145,7 +165,7 @@ async function main() {
       if (isMac) { await shell.openExternal(FDA_URL); return {ok: true}; }
       const args = app.isPackaged ? ['--aster-relaunch'] : [app.getAppPath(), '--aster-relaunch'];
       await powershell('Start-Process -FilePath $in.file -ArgumentList $in.args -Verb RunAs', {input: {file: process.execPath, args: args.map(a => `"${a}"`).join(' ')}, timeout: 60000})
-        .catch(e => { throw new Error(/cancel/i.test(e.message) ? 'Elevation was cancelled.' : e.message); });
+        .catch(e => { throw new Error(/cancel/i.test(e.message) ? t('main.elevationCancelled') : e.message); });
       setTimeout(() => app.quit(), 200);
       return {ok: true};
     },
@@ -159,22 +179,24 @@ async function main() {
     'settings.update': patch => {
       const s = store.updateSettings(patch);
       if (patch && 'theme' in patch) { nativeTheme.themeSource = s.theme; win?.setTitleBarOverlay?.(overlayColors(s.theme)); }
+      if (patch && 'language' in patch && i18n.getLanguage() !== s.language) { i18n.setLanguage(s.language); Menu.setApplicationMenu(appMenu()); }
       return s;
     },
-    'settings.pickExclusion': async () => (await pick({title: 'Choose a folder Aster should never clean', properties: ['openDirectory']}))?.[0] || null,
+    'settings.pickExclusion': async () => (await pick({title: t('dialog.exclusion'), properties: ['openDirectory']}))?.[0] || null,
 
     'cleaner.rules': () => cleaner.rules(),
     'cleaner.analyze': a => cleaner.analyze({ids: a.ids, onProgress: p => send('cleaner', p)}),
+    'cleaner.relabel': a => relabel(a?.analysis),
     'cleaner.clean': async a => {
       const drives = Array.isArray(a.drives) ? a.drives.filter(d => typeof d === 'string' && d.length < 200 && (isMac || /^[A-Z]:$/.test(d))) : null;
       const paths = Array.isArray(a.paths) ? a.paths.filter(p => typeof p === 'string' && path.isAbsolute(p)).slice(0, 50) : null;
       const r = await cleaner.clean({ids: a.ids, closeApps: !!a.closeApps, drives: drives?.length ? drives : null, paths: paths?.length ? paths : null, onProgress: p => send('cleaner', p)});
-      if (r.deleted > 0 || r.freed > 0) store.log({kind: 'clean', title: `Cleaned ${r.deleted.toLocaleString()} files`, bytes: r.freed, count: r.deleted});
+      if (r.deleted > 0 || r.freed > 0) store.log({kind: 'clean', key: 'activity.cleaned', vars: {count: r.deleted}, bytes: r.freed, count: r.deleted});
       return r;
     },
     'cleaner.removeFiles': async a => {
       const r = await cleaner.removeFiles({id: String(a?.id || ''), paths: a?.paths});
-      if (r.done.length) store.log({kind: 'trash', title: `Moved ${r.done.length} file${r.done.length === 1 ? '' : 's'} to the ${isMac ? 'Trash' : 'Recycle Bin'}`, bytes: r.freed, count: r.done.length});
+      if (r.done.length) store.log({kind: 'trash', key: isMac ? 'activity.trashedFilesTrash' : 'activity.trashedFilesBin', vars: {count: r.done.length}, bytes: r.freed, count: r.done.length});
       return r;
     },
     'cleaner.cancel': () => { cleaner.cancel(); return {ok: true}; },
@@ -186,12 +208,12 @@ async function main() {
     'registry.edit': a => registry.edit(a),
     'registry.search': a => registry.search(a),
     'registry.export': async a => {
-      const r = await dialog.showSaveDialog(win, {title: 'Export registry key', defaultPath: `${String(a.path).split('\\').pop() || 'registry'}.reg`, filters: [{name: 'Registration file', extensions: ['reg']}]});
+      const r = await dialog.showSaveDialog(win, {title: t('dialog.exportKey'), defaultPath: `${String(a.path).split('\\').pop() || 'registry'}.reg`, filters: [{name: t('dialog.regFile'), extensions: ['reg']}]});
       if (r.canceled || !r.filePath) return {cancelled: true};
       return registry.exportKey({path: a.path, file: r.filePath});
     },
     'registry.import': async () => {
-      const files = await pick({title: 'Import a registry file', properties: ['openFile'], filters: [{name: 'Registration file', extensions: ['reg']}]});
+      const files = await pick({title: t('dialog.importReg'), properties: ['openFile'], filters: [{name: t('dialog.regFile'), extensions: ['reg']}]});
       if (!files) return {cancelled: true};
       return registry.importFile({file: files[0]});
     },
@@ -210,8 +232,8 @@ async function main() {
     'startup.remove': a => startup.remove(a),
     'startup.add': async () => {
       const files = isMac
-        ? await pick({title: 'Choose an app to open at login', defaultPath: '/Applications', properties: ['openFile', 'treatPackageAsDirectory'].slice(0, 1), filters: [{name: 'Applications', extensions: ['app']}]})
-        : await pick({title: 'Choose a program to run at sign-in', properties: ['openFile'], filters: [{name: 'Programs', extensions: ['exe', 'bat', 'cmd', 'lnk']}]});
+        ? await pick({title: t('dialog.loginApp'), defaultPath: '/Applications', properties: ['openFile', 'treatPackageAsDirectory'].slice(0, 1), filters: [{name: t('dialog.applications'), extensions: ['app']}]})
+        : await pick({title: t('dialog.startupProgram'), properties: ['openFile'], filters: [{name: t('dialog.programs'), extensions: ['exe', 'bat', 'cmd', 'lnk']}]});
       if (!files) return {cancelled: true};
       const file = files[0];
       return startup.add({name: path.basename(file, path.extname(file)), command: `"${file}"`});
@@ -225,18 +247,19 @@ async function main() {
     // Last results of slow scans, kept across restarts. The page saves Cleaner and Duplicates results; the disk tree is saved by Disk.
     'scans.load': async a => {
       const kind = String(a?.kind || '');
-      if (kind !== 'cleaner' && kind !== 'duplicates') throw new Error('Unknown scan');
+      if (kind !== 'cleaner' && kind !== 'duplicates') throw new Error(t('main.unknownScan'));
       const saved = await scans.load(kind);
       if (saved && kind === 'duplicates') saved.data = pruneDuplicates(saved.data);
+      if (saved && kind === 'cleaner') saved.data = relabel(saved.data);
       return saved;
     },
     'scans.save': async a => {
       const kind = String(a?.kind || '');
-      if (kind !== 'cleaner' && kind !== 'duplicates') throw new Error('Unknown scan');
+      if (kind !== 'cleaner' && kind !== 'duplicates') throw new Error(t('main.unknownScan'));
       return {ok: await scans.save(kind, a?.data ?? null)};
     },
     'disk.last': () => disk.last(),
-    'disk.pickFolder': async () => (await pick({title: 'Choose a folder to analyze', properties: ['openDirectory']}))?.[0] || null,
+    'disk.pickFolder': async () => (await pick({title: t('dialog.analyzeFolder'), properties: ['openDirectory']}))?.[0] || null,
     'disk.analyze': a => disk.analyze({root: a.root, onProgress: p => send('disk', p)}),
     'disk.children': a => disk.children(a),
     'disk.duplicates': a => disk.findDuplicates({roots: a.roots, minSize: a.minSize, onProgress: p => send('duplicates', p)}),
@@ -278,7 +301,7 @@ async function main() {
     if (!fn) throw new Error(`Unknown method ${method}`);
     if (process.env.ASTER_SELFTEST) console.log('[api]', method);
     try { return await fn(args || {}); }
-    catch (e) { throw new Error(e?.message || 'The operation failed.'); }
+    catch (e) { throw new Error(tError(e?.message) || t('error.failed')); }
   });
 
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
@@ -303,6 +326,6 @@ async function main() {
   if (!app.isPackaged && process.env.ASTER_SELFTEST) require('../../scripts/selftest.cjs')(win, process.env.ASTER_SELFTEST).finally(() => app.quit());
 }
 
-main().catch(e => { dialog.showErrorBox('Aster could not start', String(e?.stack || e)); app.quit(); });
+main().catch(e => { dialog.showErrorBox(t('main.couldNotStart'), String(e?.stack || e)); app.quit(); });
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (win) win.show(); });

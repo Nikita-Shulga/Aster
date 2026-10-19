@@ -1,5 +1,6 @@
 'use strict';
 const {sh, sudo, osa} = require('./sh.cjs');
+const {t, td} = require('../i18n.cjs');
 
 const APPS = {activity: 'Activity Monitor', diskutil: 'Disk Utility', console: 'Console', sysinfo: 'System Information', terminal: 'Terminal', keychain: 'Keychain Access', timemachine: 'Time Machine', script: 'Script Editor'};
 const SETTINGS = {
@@ -26,7 +27,11 @@ const CATALOG = {
 
 class MacTools {
   constructor({store, shell}) { this.store = store; this.shell = shell; }
-  catalog() { return CATALOG; }
+  // Titles and texts are written in English above and shown in the interface language.
+  catalog() {
+    return {...CATALOG, actions: CATALOG.actions.map(a => ({...a, title: td(a.title), text: td(a.text)})),
+      launchers: CATALOG.launchers.map(([id, name, icon]) => [id, td(name), icon]), settings: CATALOG.settings.map(([id, name, icon]) => [id, td(name), icon])};
+  }
   async launch({id}) {
     if (SETTINGS[id]) { await this.shell.openExternal(SETTINGS[id]); return {ok: true}; }
     if (!APPS[id]) throw new Error('Unknown tool');
@@ -35,23 +40,23 @@ class MacTools {
   }
   async run({id}) {
     switch (id) {
-      case 'snapshot': await sh('/usr/bin/tmutil', ['localsnapshot'], {timeout: 120000}); this.store.log({kind: 'tool', title: 'Created a Time Machine local snapshot'}); return {ok: true, message: 'Snapshot created'};
+      case 'snapshot': await sh('/usr/bin/tmutil', ['localsnapshot'], {timeout: 120000}); this.store.log({kind: 'tool', key: 'activity.snapshot'}); return {ok: true, message: td('Snapshot created')};
       case 'thin': {
         const before = (await sh('/usr/bin/tmutil', ['listlocalsnapshots', '/']).catch(() => '')).split('\n').filter(l => /snapshot/i.test(l)).length;
         await sh('/usr/bin/tmutil', ['thinlocalsnapshots', '/', '999999999999', '4'], {timeout: 300000});
-        this.store.log({kind: 'tool', title: 'Removed Time Machine local snapshots'});
-        return {ok: true, message: before ? `Removed up to ${before} local snapshot${before === 1 ? '' : 's'}` : 'No local snapshots were found'};
+        this.store.log({kind: 'tool', key: 'activity.snapshotsRemoved'});
+        return {ok: true, message: before ? t('mac.snapshotsRemoved', {count: before}) : td('No local snapshots were found')};
       }
-      case 'dns': await sudo('/usr/bin/dscacheutil -flushcache; /usr/bin/killall -HUP mDNSResponder'); this.store.log({kind: 'tool', title: 'Flushed DNS cache'}); return {ok: true, message: 'DNS cache flushed'};
-      case 'reindex': await sudo('/usr/bin/mdutil -E /'); this.store.log({kind: 'tool', title: 'Started rebuilding the Spotlight index'}); return {ok: true, message: 'Spotlight is re-indexing in the background'};
-      case 'purge': await sudo('/usr/sbin/purge', {timeout: 120000}); this.store.log({kind: 'tool', title: 'Freed inactive memory'}); return {ok: true, message: 'Inactive memory freed'};
+      case 'dns': await sudo('/usr/bin/dscacheutil -flushcache; /usr/bin/killall -HUP mDNSResponder'); this.store.log({kind: 'tool', key: 'activity.dnsFlushed'}); return {ok: true, message: td('DNS cache flushed')};
+      case 'reindex': await sudo('/usr/bin/mdutil -E /'); this.store.log({kind: 'tool', key: 'activity.spotlight'}); return {ok: true, message: td('Spotlight is re-indexing in the background')};
+      case 'purge': await sudo('/usr/sbin/purge', {timeout: 120000}); this.store.log({kind: 'tool', key: 'activity.purge'}); return {ok: true, message: td('Inactive memory freed')};
       // Finder can empty the Trash without Full Disk Access (macOS asks once to allow Aster to control Finder).
       case 'bin':
         await osa('tell application "Finder" to empty trash', {timeout: 600000}).catch(e => { throw new Error(/-1743|not authori[sz]ed/i.test(e.message) ? 'Allow Aster to control Finder in System Settings → Privacy & Security → Automation.' : e.message); });
-        this.store.log({kind: 'clean', title: 'Emptied the Trash'}); return {ok: true, message: 'Trash emptied'};
+        this.store.log({kind: 'clean', key: 'activity.trashEmptied'}); return {ok: true, message: td('Trash emptied')};
       case 'lsreset':
         await sh('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', ['-kill', '-r', '-domain', 'local', '-domain', 'system', '-domain', 'user'], {timeout: 300000});
-        this.store.log({kind: 'tool', title: 'Rebuilt the Launch Services database'}); return {ok: true, message: '“Open With” list rebuilt'};
+        this.store.log({kind: 'tool', key: 'activity.launchServices'}); return {ok: true, message: td('“Open With” list rebuilt')};
       default: throw new Error('Unknown action');
     }
   }

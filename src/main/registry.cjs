@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const {psJson, arr, run, sys32} = require('./ps.cjs');
 const S = require('./registry-ps.cjs');
+const {td} = require('./i18n.cjs');
 
 // verdict: safe = fix without worry · review = harmless to keep, small chance of side effects when removed
 const CATEGORIES = [
@@ -83,7 +84,8 @@ const validPath = p => {
 class Registry {
   constructor({store}) { this.store = store; this.issues = new Map(); }
 
-  categories() { return CATEGORIES; }
+  // Category text is written in English above and shown in the interface language.
+  categories() { return CATEGORIES.map(c => ({...c, name: td(c.name), description: td(c.description), contains: td(c.contains), ifDeleted: td(c.ifDeleted), advice: td(c.advice)})); }
 
   async scan({categories}) {
     const ids = (Array.isArray(categories) && categories.length ? categories : CATEGORIES.map(c => c.id)).filter(id => CATEGORIES.some(c => c.id === id));
@@ -106,7 +108,7 @@ class Registry {
     const ok = results.filter(r => r.ok).map(r => r.id);
     ok.forEach(id => this.issues.delete(id));
     const failed = results.filter(r => !r.ok);
-    this.store.log({kind: 'registry', title: `Fixed ${ok.length} registry issue${ok.length === 1 ? '' : 's'}`, count: ok.length, backup: backup.name});
+    this.store.log({kind: 'registry', key: 'activity.registryFixed', vars: {count: ok.length}, count: ok.length, backup: backup.name});
     return {fixed: ok, failed, backup: backup.name};
   }
 
@@ -127,8 +129,8 @@ class Registry {
     if (op === 'setValue' && !['String', 'ExpandString', 'DWord', 'QWord', 'Binary', 'MultiString'].includes(input.kind)) throw new Error('Unsupported value type');
     const backup = this.store.newBackupFile('registry-edit');
     await psJson(S.EDIT, {op, path, name, newName: input.newName, kind: input.kind, data: input.data, backup: backup.file}, {timeout: 60000});
-    const label = {setValue: `Set value "${name || '(Default)'}"`, deleteValue: `Deleted value "${name || '(Default)'}"`, createKey: `Created key "${name}"`, deleteKey: 'Deleted key', renameValue: `Renamed value "${name}" to "${input.newName}"`}[op];
-    this.store.log({kind: 'registry-edit', title: label, detail: path, backup: backup.name});
+    const key = {setValue: 'activity.regSetValue', deleteValue: 'activity.regDeleteValue', createKey: 'activity.regCreateKey', deleteKey: 'activity.regDeleteKey', renameValue: 'activity.regRenameValue'}[op];
+    this.store.log({kind: 'registry-edit', key, vars: {name: name || (op === 'createKey' ? '' : '(Default)'), newName: input.newName}, detail: path, backup: backup.name});
     return {ok: true, backup: backup.name};
   }
 
@@ -147,7 +149,7 @@ class Registry {
   async importFile({file}) {
     try { await run(sys32('reg.exe'), ['import', file, '/reg:64'], {timeout: 120000}); }
     catch (e) { throw new Error(String(e.stderr || '').trim() || 'The file could not be imported.'); }
-    this.store.log({kind: 'registry-edit', title: 'Imported registry file', detail: file});
+    this.store.log({kind: 'registry-edit', key: 'activity.regImported', detail: file});
     return {ok: true};
   }
 }
