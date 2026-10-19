@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest"><img alt="Release 2.3.0" src="https://img.shields.io/badge/release-v2.3.0-5B4CF0?style=flat-square"></a>
+  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest"><img alt="Release 2.4.0" src="https://img.shields.io/badge/release-v2.4.0-5B4CF0?style=flat-square"></a>
   <a href="https://github.com/Nikita-Shulga/Aster/actions/workflows/build.yml"><img alt="Build" src="https://github.com/Nikita-Shulga/Aster/actions/workflows/build.yml/badge.svg"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-555?style=flat-square">
   <img alt="Electron 44" src="https://img.shields.io/badge/electron-44-555?style=flat-square">

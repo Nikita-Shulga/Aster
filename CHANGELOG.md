@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.4.0 — 2026-10-20
 - **Aster speaks Russian**: *Settings → Language → Interface language* switches between **English** and **Русский** right away, without a restart. Everything is translated — pages, dialogs and messages, the explanation of every cleaner item, registry category, tweak and file type, History entries (older ones too) and the macOS menu bar. Numbers, sizes and dates follow the chosen language (“1,5 ГБ”). English stays the default for new and existing users; Aster never picks the language from the system.
 
 ## 2.3.0 — 2026-10-19
