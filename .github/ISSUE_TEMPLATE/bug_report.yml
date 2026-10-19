@@ -53,7 +53,7 @@ body:
     id: version
     attributes:
       label: Aster version
-      placeholder: "2.2.0 (shown in Settings → About)"
+      placeholder: "2.3.0 (shown in Settings → About)"
     validations:
       required: true
   - type: input

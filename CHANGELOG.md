@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.3.0 — 2026-10-19
 - **Results stay after you close Aster**: the last Disk analyzer, Duplicates and Cleaner results are saved and shown again when you reopen Aster, marked *Results from your previous scan* with the date, next to the button for a fresh scan. You can still click into folders of a saved disk analysis; duplicate files that no longer exist are left out. Results are stored compressed in Aster's data folder, on Windows and macOS.
 
 ## 2.2.0 — 2026-10-19
