@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.0 — 2026-10-19
 - **Update Aster from Settings**: *Settings → Updates → Check for updates* asks GitHub for the latest release and shows what's new. *Update now* downloads it, checks it against the release's published SHA-256 checksum, installs it silently and reopens Aster on the new version. The portable app saves the new version next to the old one and opens it; on a Mac the new DMG opens in Finder. Aster only goes online when you click.
 - The version badge next to the Aster logo now shows the installed version (2.1.0 still said "2.0").
 

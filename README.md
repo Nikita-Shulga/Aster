@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest"><img alt="Release 2.1.0" src="https://img.shields.io/badge/release-v2.1.0-5B4CF0?style=flat-square"></a>
+  <a href="https://github.com/Nikita-Shulga/Aster/releases/latest"><img alt="Release 2.2.0" src="https://img.shields.io/badge/release-v2.2.0-5B4CF0?style=flat-square"></a>
   <a href="https://github.com/Nikita-Shulga/Aster/actions/workflows/build.yml"><img alt="Build" src="https://github.com/Nikita-Shulga/Aster/actions/workflows/build.yml/badge.svg"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-555?style=flat-square">
   <img alt="Electron 44" src="https://img.shields.io/badge/electron-44-555?style=flat-square">
@@ -144,7 +144,13 @@ It doesn't for most things. On Windows, a few system areas (Windows Update cache
 <details>
 <summary><b>Does Aster send anything over the internet?</b></summary>
 
-No telemetry, no account, no analytics. The only network activity is when you press **Check for updates**, which asks WinGet (Windows) or Homebrew / Apple (Mac).
+No telemetry, no account, no analytics. The only network activity is when you press **Check for updates**: on the Updates page that asks WinGet (Windows) or Homebrew / Apple (Mac) about your apps; in **Settings → Updates** it asks GitHub for the latest Aster release.
+</details>
+
+<details>
+<summary><b>How do I update Aster?</b></summary>
+
+Open **Settings → Updates** and press **Check for updates**. If there's a new version, **Update now** downloads it from this repository's releases, checks it against the published `SHA256SUMS.txt`, installs it and reopens Aster. The portable app opens the new portable file; on a Mac the new DMG opens in Finder, ready to drag into Applications. (Versions before 2.2.0 need one manual install.)
 </details>
 
 <details>
