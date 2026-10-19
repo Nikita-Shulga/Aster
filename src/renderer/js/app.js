@@ -91,7 +91,7 @@ async function boot() {
   document.getElementById('app').innerHTML = str(html`
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand"><span id="logo"></span><span class="brand-name">Aster</span><span class="brand-tag">2.0</span></div>
+        <div class="brand"><span id="logo"></span><span class="brand-name">Aster</span><span class="brand-tag" id="brand-tag"></span></div>
         <nav class="nav" id="nav"></nav>
         <div class="sidebar-foot" id="sidebar-foot"></div>
       </aside>
@@ -115,6 +115,7 @@ async function boot() {
     const [settingsData, info] = await Promise.all([api('settings.get'), api('app.info')]);
     setApp({settings: settingsData, info});
     applyTheme(settingsData.theme);
+    document.getElementById('brand-tag').textContent = String(info.version || '').split('.').slice(0, 2).join('.');
   } catch (e) { fail(e); }
   show(location.hash.replace('#/', '') || 'overview');
   api('system.info').then(system => setApp({system})).catch(fail);

@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- The version badge next to the Aster logo now shows the installed version (2.1.0 still said "2.0").
+
 ## 2.1.0 — 2026-10-19
 
 ### Cleaner: clean exactly what you want
