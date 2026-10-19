@@ -151,6 +151,13 @@ export function empty({iconName = 'sparkles', title, text = '', action = ''}) {
   return html`<div class="empty"><div class="empty-icon">${ic(iconName, 26)}</div><h3>${title}</h3>${text ? html`<p>${text}</p>` : ''}${action}</div>`;
 }
 
+// Shown above results that were restored from the last run instead of scanned just now.
+// With action: null the page already has its own rescan button, named by label.
+export function previousScan(at, {action = 'rescan', label = 'Rescan'} = {}) {
+  const when = at ? `${date(at)}, ${time(at)} (${ago(at)})` : 'an earlier session';
+  return html`<div class="callout blue" style="margin-bottom:12px">${ic('history', 18)}<div class="grow"><strong>Results from your previous scan</strong> · ${when}. Files may have changed since then${action ? '.' : html` — press <strong>${label}</strong> for fresh results.`}</div>${action ? html`<button class="btn btn-sm btn-secondary" data-action="${action}">${ic('refresh', 15)} ${label}</button>` : ''}</div>`;
+}
+
 export function avatar(name, src, size = 32) {
   if (src) return html`<img class="avatar" src="${src}" width="${size}" height="${size}" alt="">`;
   const letter = (String(name || '?').match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase();

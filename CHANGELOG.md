@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Results stay after you close Aster**: the last Disk analyzer, Duplicates and Cleaner results are saved and shown again when you reopen Aster, marked *Results from your previous scan* with the date, next to the button for a fresh scan. You can still click into folders of a saved disk analysis; duplicate files that no longer exist are left out. Results are stored compressed in Aster's data folder, on Windows and macOS.
+
 ## 2.2.0 — 2026-10-19
 - **Update Aster from Settings**: *Settings → Updates → Check for updates* asks GitHub for the latest release and shows what's new. *Update now* downloads it, checks it against the release's published SHA-256 checksum, installs it silently and reopens Aster on the new version. The portable app saves the new version next to the old one and opens it; on a Mac the new DMG opens in Finder. Aster only goes online when you click.
 - The version badge next to the Aster logo now shows the installed version (2.1.0 still said "2.0").

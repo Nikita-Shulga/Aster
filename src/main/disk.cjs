@@ -5,7 +5,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 
 class Disk {
-  constructor({store, trash}) { this.store = store; this.trash = trash; this.worker = null; this.analysis = null; this.dupes = null; }
+  constructor({store, trash, cache = null}) { this.store = store; this.trash = trash; this.cache = cache; this.worker = null; this.analysis = null; this.summary = null; this.dupes = null; this.saveTimer = null; }
 
   run(data, onProgress) {
     this.cancel();
@@ -27,7 +27,26 @@ class Disk {
   async analyze({root, onProgress}) {
     const r = await this.run({mode: 'analyze', root: checkRoot(root)}, onProgress);
     this.analysis = {root: path.resolve(root), ...r};
-    return {root: this.analysis.root, size: r.tree.s, files: r.files, errors: r.errors, top: r.top, types: r.types, at: new Date().toISOString()};
+    this.summary = {root: this.analysis.root, size: r.tree.s, files: r.files, errors: r.errors, top: r.top, types: r.types, at: new Date().toISOString()};
+    this.persist(0);
+    return this.summary;
+  }
+
+  // The last analysis, saved so it survives a restart. Drilling into folders works from the saved tree.
+  persist(delay = 1500) {
+    if (!this.cache || !this.analysis || !this.summary) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.cache.save('disk', {summary: this.summary, tree: this.analysis.tree}), delay);
+  }
+
+  async last() {
+    if (this.summary) return {...this.summary, restored: false};
+    const saved = await this.cache?.load('disk');
+    const d = saved?.data;
+    if (!d?.summary || !d.tree || !fs.existsSync(d.summary.root)) return null;
+    this.analysis = {root: d.summary.root, tree: d.tree};
+    this.summary = d.summary;
+    return {...this.summary, restored: true};
   }
 
   node(p) {
@@ -81,6 +100,12 @@ class Disk {
       } catch (e) { failed.push({path: p, error: e.message}); }
     }
     if (done.length) this.store.log({kind: 'trash', title: `Moved ${done.length} item${done.length === 1 ? '' : 's'} to the Recycle Bin`, bytes, count: done.length});
+    if (done.length && this.summary) {
+      const gone = done.map(p => path.resolve(p).toLowerCase());
+      const inside = f => gone.some(g => { const p = path.resolve(f).toLowerCase(); return p === g || p.startsWith(g + path.sep); });
+      this.summary = {...this.summary, size: this.analysis.tree.s, top: this.summary.top.filter(f => !inside(f.path))};
+      this.persist();
+    }
     return {done, failed, bytes};
   }
 

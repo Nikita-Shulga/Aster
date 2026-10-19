@@ -1,6 +1,6 @@
 import {html, str, ic, api, app, isMac, bytes, num, plural, duration, ring, bar, pct, modal, toast, ago, fail} from '../lib.js';
 import {definePage} from '../page.js';
-import {shared, notify, analyzeCleaner, scanRegistry, checkUpdates, loadRules, cleanableBytes, fixableCount} from '../state.js';
+import {shared, notify, analyzeCleaner, scanRegistry, checkUpdates, loadRules, cleanableBytes, fixableCount, persistCleaner} from '../state.js';
 import {pendingRecommended} from './optimize.js';
 
 const s = {phase: 'idle', steps: {}, fixed: null, live: null, activity: null, stats: null};
@@ -51,7 +51,7 @@ async function fixAll(page) {
       const c = shared.cleaner;
       const ids = c.analysis.results.filter(r => r.bytes > 0).map(r => r.id);
       c.phase = 'cleaning'; notify();
-      try { const r = await api('cleaner.clean', {ids, closeApps: !!app.settings?.closeAppsBeforeCleaning}); freed = r.freed; c.lastClean = null; c.analysis = null; }
+      try { const r = await api('cleaner.clean', {ids, closeApps: !!app.settings?.closeAppsBeforeCleaning}); freed = r.freed; c.lastClean = null; c.analysis = null; persistCleaner(); }
       finally { c.phase = 'idle'; }
     }
     if (reg) {

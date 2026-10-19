@@ -37,15 +37,33 @@ export const usableRule = r => r.installed && !(r.admin && !app.system?.admin) &
 export async function saveSelection() {
   const s = await api('settings.update', {cleanerSelection: [...shared.cleaner.selected]});
   setApp({settings: s});
+  persistCleaner(); // a different selection makes the saved analysis outdated
+}
+
+// The last analysis is kept across restarts; null forgets it (after cleaning or a new selection).
+export const persistCleaner = () => api('scans.save', {kind: 'cleaner', data: shared.cleaner.analysis || null}).catch(() => {});
+
+// Brings back the analysis from before Aster was closed, once per session.
+export async function restoreCleaner() {
+  const c = await loadRules();
+  if (c.triedLast || c.analysis || c.phase !== 'idle') return;
+  c.triedLast = true;
+  const saved = await api('scans.load', {kind: 'cleaner'}).catch(() => null);
+  const a = saved?.data;
+  if (!a || !Array.isArray(a.results) || c.analysis || c.phase !== 'idle') return;
+  const known = new Set(c.rules.map(r => r.id));
+  c.analysis = {...a, results: a.results.filter(r => known.has(r.id)), at: a.at || saved.savedAt};
+  c.restored = true; c.phase = 'analyzed'; notify();
 }
 
 export async function analyzeCleaner() {
   const c = await loadRules();
   const ids = c.rules.filter(r => c.selected.has(r.id) && usableRule(r)).map(r => r.id);
-  c.phase = 'analyzing'; c.analysis = null; c.lastClean = null; c.progress = {index: 0, total: ids.length, label: 'Preparing…'}; notify();
+  c.phase = 'analyzing'; c.analysis = null; c.lastClean = null; c.restored = false; c.progress = {index: 0, total: ids.length, label: 'Preparing…'}; notify();
   try {
-    c.analysis = await api('cleaner.analyze', {ids});
+    c.analysis = {...await api('cleaner.analyze', {ids}), at: new Date().toISOString()};
     c.phase = 'analyzed';
+    persistCleaner();
   } catch (e) { c.phase = 'idle'; throw e; } finally { notify(); }
   return c.analysis;
 }

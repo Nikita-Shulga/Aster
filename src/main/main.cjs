@@ -7,6 +7,7 @@ const {Store} = require('./store.cjs');
 const {Cleaner} = require('./cleaner.cjs');
 const {Disk} = require('./disk.cjs');
 const {Updater} = require('./updater.cjs');
+const {ScanCache, pruneDuplicates} = require('./scans.cjs');
 
 // Platform layer: the same API on Windows and macOS, implemented natively for each.
 const isMac = process.platform === 'darwin';
@@ -125,7 +126,8 @@ async function main() {
   const programs = new P.Programs({store, getIcon, trash});
   const startup = new P.Startup({store, getIcon, trash});
   const updates = new P.Updates({store});
-  const disk = new Disk({store, trash});
+  const scans = new ScanCache(app.getPath('userData'));
+  const disk = new Disk({store, trash, cache: scans});
   const tools = new P.Tools({store, shell});
   const tweaks = new P.Tweaks({store, buildNumber: async () => (sysInfo || (sysInfo = await system.info())).build || 0});
   const display = new P.Display({store});
@@ -220,6 +222,20 @@ async function main() {
     'updates.last': () => updates.last(),
     'updates.update': a => updates.update({id: a.id, onLine: line => send('updates', {id: a.id, line})}),
 
+    // Last results of slow scans, kept across restarts. The page saves Cleaner and Duplicates results; the disk tree is saved by Disk.
+    'scans.load': async a => {
+      const kind = String(a?.kind || '');
+      if (kind !== 'cleaner' && kind !== 'duplicates') throw new Error('Unknown scan');
+      const saved = await scans.load(kind);
+      if (saved && kind === 'duplicates') saved.data = pruneDuplicates(saved.data);
+      return saved;
+    },
+    'scans.save': async a => {
+      const kind = String(a?.kind || '');
+      if (kind !== 'cleaner' && kind !== 'duplicates') throw new Error('Unknown scan');
+      return {ok: await scans.save(kind, a?.data ?? null)};
+    },
+    'disk.last': () => disk.last(),
     'disk.pickFolder': async () => (await pick({title: 'Choose a folder to analyze', properties: ['openDirectory']}))?.[0] || null,
     'disk.analyze': a => disk.analyze({root: a.root, onProgress: p => send('disk', p)}),
     'disk.children': a => disk.children(a),

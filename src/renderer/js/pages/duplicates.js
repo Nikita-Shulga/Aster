@@ -1,11 +1,13 @@
-import {html, ic, api, app, bytes, num, plural, date, checkbox, empty, modal, toast, bar, pct, onEvent} from '../lib.js';
+import {html, ic, api, app, bytes, num, plural, date, checkbox, empty, modal, toast, bar, pct, onEvent, previousScan} from '../lib.js';
 import {definePage} from '../page.js';
 import {chip, countOptions, search as searchBox, filterHandlers, driveOf, baseName} from '../filters.js';
 import {isMac} from '../lib.js';
 const TRASH_WORD = isMac ? 'Trash' : 'Recycle Bin';
 const rootOf = d => d.root || `${d.name}\\`;
 
-const s = {phase: 'idle', root: null, minSize: 1024 * 1024, result: null, selected: new Set(), limit: 100};
+const s = {phase: 'idle', root: null, roots: null, minSize: 1024 * 1024, result: null, selected: new Set(), limit: 100, restored: false, triedLast: false};
+// Remember the result so it is still here after Aster restarts.
+const persist = () => api('scans.save', {kind: 'duplicates', data: s.result ? {...s.result, root: s.root, roots: s.roots, minSize: s.minSize} : null}).catch(() => {});
 
 onEvent(e => {
   if (e.channel !== 'duplicates' || s.phase !== 'running') return;
@@ -48,8 +50,8 @@ function autoSelect(mode) {
 
 async function start(page, root) {
   const roots = Array.isArray(root) ? root : [root];
-  s.root = Array.isArray(root) ? 'all drives' : root; s.phase = 'running'; s.result = null; s.selected.clear(); s.limit = 100; page.update();
-  try { s.result = await api('disk.duplicates', {roots, minSize: s.minSize}); s.phase = 'done'; autoSelect('newest'); }
+  s.root = Array.isArray(root) ? 'all drives' : root; s.roots = roots; s.phase = 'running'; s.result = null; s.selected.clear(); s.limit = 100; page.update();
+  try { s.result = await api('disk.duplicates', {roots, minSize: s.minSize}); s.phase = 'done'; s.restored = false; autoSelect('newest'); persist(); }
   catch (e) { s.phase = 'idle'; if (!/cancel/i.test(e.message)) throw e; }
   finally { page.update(); }
 }
@@ -77,9 +79,11 @@ export default definePage({
     const all = s.result.groups;
     const groups = shownGroups();
     const filtered = groups.length !== all.length;
-    if (!all.length) return html`${head}<div class="card">${empty({iconName: 'check', title: 'No duplicates found', text: `Checked ${plural(s.result.files, 'file')} in ${s.root}.`})}</div>`;
+    const note = s.restored ? previousScan(s.result.at, {label: 'Search again'}) : '';
+    if (!all.length) return html`${head}${note}<div class="card">${empty({iconName: 'check', title: 'No duplicates found', text: `Checked ${plural(s.result.files, 'file')} in ${s.root}.`})}</div>`;
     const selSize = all.reduce((n, g) => n + g.files.filter(f => s.selected.has(f.path)).length * g.size, 0);
     return html`${head}
+      ${note}
       <div class="card cleaner-summary">
         <div class="tile amber" style="width:52px;height:52px;border-radius:14px">${ic('copy', 26)}</div>
         <div class="grow"><div class="big num">${bytes(s.result.wasted)}</div><div class="label">taken by duplicates · ${plural(all.length, 'group')} in ${plural(s.result.files, 'scanned file')}</div></div>
@@ -111,7 +115,22 @@ export default definePage({
       </div>
       ${s.selected.size ? html`<div class="selection-bar"><strong>${plural(s.selected.size, 'file')} selected</strong><span style="opacity:.7">${bytes(selSize)}</span><span class="spacer"></span><button class="btn btn-ghost btn-sm" data-action="auto" data-mode="none">Clear</button><button class="btn btn-danger btn-sm" data-action="trash">${ic('trash', 15)} Move to ${TRASH_WORD}</button></div>` : ''}`;
   },
+  onMount() {
+    // Bring back the last search (from before Aster was closed) the first time the page opens.
+    if (s.triedLast || s.result || s.phase !== 'idle') return;
+    s.triedLast = true;
+    api('scans.load', {kind: 'duplicates'}).then(saved => {
+      const d = saved?.data;
+      if (!d || !Array.isArray(d.groups) || s.result || s.phase !== 'idle') return;
+      s.result = {...d, at: d.at || saved.savedAt};
+      s.root = d.root || 'the previous location'; s.roots = Array.isArray(d.roots) ? d.roots : null;
+      if (d.minSize) s.minSize = d.minSize;
+      s.phase = 'done'; s.restored = true; autoSelect('newest');
+      if (this.mounted) this.update();
+    }).catch(() => {});
+  },
   on: {
+    async rescan() { if (s.roots?.length) await start(this, s.roots.length > 1 ? s.roots : s.roots[0]); else { s.result = null; s.phase = 'idle'; s.restored = false; this.update(); } },
     ...filterHandlers(() => uf, DEFAULT_FILTERS),
     filter(el) { uf[el.dataset.key] = el.dataset.key === 'sort' && el.value === 'all' ? 'wasted' : el.value; this.update(); },
     autoSel(el) { if (el.value) { autoSelect(el.value); this.update(); } },
@@ -120,7 +139,7 @@ export default definePage({
     async go(el) { await start(this, el.dataset.root); },
     async choose() { const p = await api('disk.pickFolder'); if (p) await start(this, p); },
     async cancel() { await api('disk.cancel'); },
-    reset() { s.result = null; s.phase = 'idle'; this.update(); },
+    reset() { s.result = null; s.phase = 'idle'; s.restored = false; this.update(); },
     more() { s.limit += 200; this.update(); },
     reveal(el) { api('shell.reveal', {path: el.dataset.path}); },
     auto(el) { autoSelect(el.dataset.mode); this.update(); },
@@ -143,6 +162,7 @@ export default definePage({
       s.result.groups = s.result.groups.map(g => ({...g, files: g.files.filter(f => !gone.has(f.path))})).filter(g => g.files.length > 1);
       s.result.wasted = s.result.groups.reduce((n, g) => n + g.size * (g.files.length - 1), 0);
       gone.forEach(p => s.selected.delete(p));
+      persist();
       toast(`Moved ${plural(r.done.length, 'file')} to the ${TRASH_WORD} · ${bytes(r.bytes)}`, {type: 'success'});
       this.update();
     }

@@ -1,6 +1,6 @@
-import {html, ic, api, app, bytes, num, plural, checkbox, empty, bar, modal, toast, setApp, VERDICTS, verdictBadge, explain, isMac} from '../lib.js';
+import {html, ic, api, app, bytes, num, plural, checkbox, empty, bar, modal, toast, setApp, VERDICTS, verdictBadge, explain, isMac, previousScan} from '../lib.js';
 import {definePage} from '../page.js';
-import {shared, notify, loadRules, usableRule, saveSelection, analyzeCleaner, cleanableBytes} from '../state.js';
+import {shared, notify, loadRules, usableRule, saveSelection, analyzeCleaner, cleanableBytes, persistCleaner, restoreCleaner} from '../state.js';
 import {chip, resultLine, filterHandlers} from '../filters.js';
 import {bytes as fmtBytes} from '../lib.js';
 
@@ -99,6 +99,7 @@ function results() {
   const filtered = cf.drive !== 'all' || cf.verdict !== 'all' || cf.group !== 'all';
   const VERD = [{value: 'safe', label: 'Safe to delete'}, {value: 'review', label: 'Read first'}, {value: 'keep', label: 'Better to keep'}];
   return html`
+    ${c.restored ? previousScan(a.at, {action: null, label: 'Analyze again'}) : ''}
     <div class="card cleaner-summary">
       <div class="tile green" style="width:52px;height:52px;border-radius:14px">${ic('sparkles', 26)}</div>
       <div class="grow">
@@ -195,7 +196,7 @@ export default definePage({
   onMount() {
     this.listener = () => this.update();
     shared.listeners.add(this.listener);
-    if (!c.rules) loadRules().then(() => this.update());
+    loadRules().then(() => this.update()).then(() => restoreCleaner()).catch(() => {});
   },
   onUnmount() { shared.listeners.delete(this.listener); },
   on: {
@@ -234,6 +235,7 @@ export default definePage({
           const loc = (r.locations || []).filter(l => path.startsWith(l.path)).sort((a, b) => b.path.length - a.path.length)[0];
           if (loc) { loc.bytes = Math.max(0, loc.bytes - size); loc.files = Math.max(0, loc.files - 1); }
           c.analysis.totalBytes = Math.max(0, c.analysis.totalBytes - size);
+          persistCleaner();
           toast(`Moved to the ${isMac ? 'Trash' : 'Recycle Bin'} · ${bytes(size)}`, {type: 'success'});
           notify();
         } else toast(res.failed[0]?.error || 'The file could not be removed.', {type: 'error'});
@@ -254,6 +256,7 @@ export default definePage({
         r.locations = r.locations.filter(l => l !== loc);
         r.bytes = Math.max(0, r.bytes - res.freed); r.files = Math.max(0, r.files - res.deleted);
         r.sample = r.sample.filter(f => !f.path.startsWith(path));
+        persistCleaner();
         toast(`Freed ${bytes(res.freed)}${res.skipped ? ` · ${num(res.skipped)} in-use files skipped` : ''}`, {type: 'success'});
       } finally { c.phase = 'analyzed'; notify(); }
     },
@@ -287,7 +290,8 @@ export default definePage({
         const r = await api('cleaner.clean', {ids, drives, closeApps: !!app.settings?.closeAppsBeforeCleaning});
         const blocked = r.results.filter(x => x.blocked).map(x => x.blocked);
         c.lastClean = {...r, blocked: blocked.length ? [...new Set(blocked)].join(', ') + ' — skipped' : ''};
-        c.analysis = null;
+        c.analysis = null; c.restored = false;
+        persistCleaner();
         toast(`Freed ${bytes(r.freed)}`, {type: 'success'});
       } finally { c.phase = 'idle'; notify(); }
     }

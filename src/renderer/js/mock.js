@@ -79,7 +79,14 @@ const tree = {
   'C:\\Users\\Alex': [['Videos', 64 * GB, 380], ['AppData', 41 * GB, 310000], ['Downloads', 28 * GB, 2100], ['Documents', 19 * GB, 48000], ['Pictures', 14 * GB, 31000], ['Desktop', 7 * GB, 410], ['Music', 5 * GB, 2800]]
 };
 
+// Preview: results "from the previous session" so the restored state can be seen; saves live only until reload.
+const savedScans = new Map();
+const earlier = () => new Date(Date.now() - 864e5 * 2 - 3.6e6 * 5).toISOString();
+
 const api = {
+  'disk.last': async () => ({...await api['disk.analyze'](), at: earlier(), restored: true}),
+  'scans.load': async ({kind}) => savedScans.get(kind) || (kind === 'duplicates' ? {v: 1, savedAt: earlier(), data: {...await api['disk.duplicates'](), root: 'C:\\', roots: ['C:\\'], minSize: MB, at: earlier()}} : null),
+  'scans.save': ({kind, data}) => { if (data == null) savedScans.delete(kind); else savedScans.set(kind, {v: 1, savedAt: new Date().toISOString(), data: structuredClone(data)}); return {ok: true}; },
   'app.info': () => ({version: '1.0.0', electron: '44.8.0', dataPath: 'C:\\Users\\Alex\\AppData\\Roaming\\Aster'}),
   'system.info': () => MAC ? ({os: 'macOS Sequoia', osVersion: '15.6 (24G84)', build: 15, arch: 'arm64', hostname: 'Alex-MacBook-Pro', user: 'alex', model: 'MacBook Pro (Mac15,6)', cpu: 'Apple M3 Pro', cores: 12, gpu: ['Apple M3 Pro'], admin: false, mac: true, fda: false, memory: {total: 18 * GB, free: 3.1 * GB}, uptime: 302000, cpuLoad: 9,
     drives: [{name: 'Macintosh HD', root: '/', label: 'Macintosh HD', format: 'APFS', type: 'Fixed', total: 994 * GB, free: 212 * GB}, {name: 'Backup', root: '/Volumes/Backup', label: 'Backup', type: 'Removable', total: 2000 * GB, free: 1210 * GB}]}) : ({os: 'Windows 11 Pro', osVersion: '25H2 (build 26200.6899)', arch: 'x64', hostname: 'ALEX-DESKTOP', user: 'alex', model: 'ASUS ROG Strix G16', cpu: 'AMD Ryzen 9 7945HX with Radeon Graphics', cores: 32, gpu: ['NVIDIA GeForce RTX 4070 Laptop GPU'], admin: false, memory: {total: 32 * GB, free: 13.4 * GB}, uptime: 192000, cpuLoad: 14,

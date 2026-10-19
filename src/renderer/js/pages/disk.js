@@ -1,4 +1,4 @@
-import {html, ic, api, app, bytes, num, plural, date, checkbox, empty, modal, toast, bar, pct, onEvent, verdictBadge, explain, VERDICTS} from '../lib.js';
+import {html, ic, api, app, bytes, num, plural, date, checkbox, empty, modal, toast, bar, pct, onEvent, verdictBadge, explain, VERDICTS, previousScan} from '../lib.js';
 import {definePage} from '../page.js';
 import {chip, search as searchBox, filterHandlers, SIZE_BUCKETS, AGE_BUCKETS, daysSince, bucketTest, sep, baseName, dirName} from '../filters.js';
 import {isMac} from '../lib.js';
@@ -32,7 +32,7 @@ function matchItem(i, skip) {
 }
 const visibleItems = () => (s.view?.items || []).filter(i => matchItem(i));
 const filtersActive = () => Object.entries(df).some(([k, v]) => v && v !== 'all');
-const s = {phase: 'idle', progress: null, result: null, path: null, view: null, selected: new Set(), tab: 'folders'};
+const s = {phase: 'idle', progress: null, result: null, path: null, view: null, selected: new Set(), tab: 'folders', restored: false, triedLast: false};
 
 onEvent(e => {
   if (e.channel !== 'disk' || s.phase !== 'running') return;
@@ -172,6 +172,7 @@ export default definePage({
     const v = s.view;
     const sel = [...s.selected];
     return html`${head}
+      ${s.restored ? previousScan(s.result.at, {action: null, label: 'Rescan'}) : ''}
       <div class="disk-layout">
         <div class="card" style="min-width:0">
           ${crumbs()}
@@ -189,7 +190,18 @@ export default definePage({
       ${sel.length ? html`<div class="selection-bar"><strong>${plural(sel.length, 'item')} selected</strong><span class="spacer"></span><button class="btn btn-ghost btn-sm" data-action="clearSel">Clear</button><button class="btn btn-danger btn-sm" data-action="trashSel">${ic('trash', 15)} Move to ${TRASH_WORD}</button></div>` : ''}`;
   },
   afterRender() { treemap(); identifyVisible(this); },
-  onMount() { this.onResize = () => treemap(); window.addEventListener('resize', this.onResize); },
+  onMount() {
+    this.onResize = () => treemap(); window.addEventListener('resize', this.onResize);
+    // Bring back the last analysis (from before Aster was closed) the first time the page opens.
+    if (!s.triedLast && !s.result && s.phase === 'idle') {
+      s.triedLast = true;
+      api('disk.last').then(async r => {
+        if (!r || s.result || s.phase !== 'idle') return;
+        s.result = r; s.restored = !!r.restored; s.phase = 'done';
+        await open(this, r.root);
+      }).catch(() => {});
+    }
+  },
   onUnmount() { window.removeEventListener('resize', this.onResize); },
   on: {
     async chooseFolder() { const p = await api('disk.pickFolder'); if (p) await analyzeRoot(this, p); },
@@ -223,7 +235,7 @@ async function analyzeRoot(pg, root) {
   s.phase = 'running'; s.root = root; s.progress = null; pg.update();
   try {
     s.result = await api('disk.analyze', {root});
-    s.phase = 'done';
+    s.phase = 'done'; s.restored = false;
     await open(pg, s.result.root);
   } catch (e) {
     s.phase = 'idle';
