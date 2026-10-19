@@ -6,6 +6,7 @@ const {powershell} = require('./ps.cjs');
 const {Store} = require('./store.cjs');
 const {Cleaner} = require('./cleaner.cjs');
 const {Disk} = require('./disk.cjs');
+const {Updater} = require('./updater.cjs');
 
 // Platform layer: the same API on Windows and macOS, implemented natively for each.
 const isMac = process.platform === 'darwin';
@@ -128,6 +129,8 @@ async function main() {
   const tools = new P.Tools({store, shell});
   const tweaks = new P.Tweaks({store, buildNumber: async () => (sysInfo || (sysInfo = await system.info())).build || 0});
   const display = new P.Display({store});
+  const updater = new Updater({app, shell, store, onProgress: p => send('appUpdate', p)});
+  setTimeout(() => updater.cleanup(), 60000); // after an update, give the installer time to exit first
 
   const pick = async (options) => { const r = await dialog.showOpenDialog(win, options); return r.canceled ? null : r.filePaths; };
 
@@ -144,6 +147,11 @@ async function main() {
       setTimeout(() => app.quit(), 200);
       return {ok: true};
     },
+
+    'appUpdate.check': () => updater.check(),
+    'appUpdate.download': () => updater.download(),
+    'appUpdate.cancel': () => updater.cancel(),
+    'appUpdate.install': () => updater.install(),
 
     'settings.get': () => store.getSettings(),
     'settings.update': patch => {

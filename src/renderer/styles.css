@@ -490,6 +490,7 @@ textarea.input { height: auto; padding: 8px 11px; resize: vertical; font-family:
 .setting:last-child { border-bottom: 0; }
 .setting .t { font-weight: 500; }
 .setting .d { color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
+.update-notes { margin-top: 10px; padding: 10px 12px; border-radius: var(--r-sm, 8px); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); font-size: 12.5px; line-height: 1.55; white-space: pre-line; max-height: 150px; overflow: auto; }
 .theme-picks { display: flex; gap: 10px; }
 .theme-pick { width: 108px; border: 2px solid var(--border); border-radius: var(--r); padding: 6px; cursor: pointer; background: var(--surface); text-align: center; font-size: 12px; font-weight: 500; }
 .theme-pick.on { border-color: var(--accent); }

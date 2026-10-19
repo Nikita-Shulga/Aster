@@ -1,5 +1,50 @@
-import {html, ic, api, app, setApp, toast, isMac} from '../lib.js';
+import {html, ic, api, app, setApp, toast, isMac, bytes, bar, pct, date, ago, onEvent} from '../lib.js';
 import {definePage} from '../page.js';
+
+// Aster's own updates (GitHub releases). Kept outside the page so a download survives navigation.
+const up = {state: 'idle', info: null, error: null, done: 0, total: 0, message: ''};
+let page = null;
+const refresh = () => page?.update();
+onEvent(e => {
+  if (e.channel !== 'appUpdate') return;
+  up.done = e.done; up.total = e.total;
+  const el = document.querySelector('[data-update-progress]');
+  if (el) { el.querySelector('.bar-fill').style.width = `${pct(e.done, e.total).toFixed(1)}%`; el.querySelector('[data-update-bytes]').textContent = `${bytes(e.done)} of ${bytes(e.total)}`; }
+});
+
+// First lines of the release notes as plain text: headings and list markers removed.
+const notesPreview = md => String(md || '').split(/\r?\n/).map(l => l.replace(/^#+\s*|^\s*[-*]\s+|\*\*|`/g, '').trim()).filter(l => l && !/^\|/.test(l) && !/^-{3,}$/.test(l)).slice(0, 8).join('\n');
+
+function updateCard(info) {
+  const u = up.info;
+  const canInstall = u && u.asset && !['dev', 'unsupported'].includes(u.kind);
+  const restartNote = u?.kind === 'mac' ? 'The new version opens in Finder, ready to drag into Applications.' : 'Aster downloads it from GitHub, checks it, then closes and reopens on the new version.';
+  let row;
+  if (up.state === 'checking') {
+    row = html`<div class="setting"><div class="tile">${ic('refresh', 18)}</div><div class="grow"><div class="t">Checking for updates…</div><div class="d">Asking GitHub for the latest release.</div></div><button class="btn btn-secondary btn-sm" disabled><span class="spinner"></span> Checking</button></div>`;
+  } else if (up.state === 'downloading') {
+    row = html`<div class="setting" style="align-items:flex-start"><div class="tile accent">${ic('download', 18)}</div><div class="grow"><div class="t">Downloading Aster ${u.latest}…</div>
+        <div data-update-progress style="margin-top:10px">${bar(pct(up.done, up.total))}<div class="d" style="margin-top:6px"><span data-update-bytes>${bytes(up.done)} of ${bytes(up.total || u.asset?.size || 0)}</span></div></div></div>
+      <button class="btn btn-secondary btn-sm" data-action="cancelUpdate">Cancel</button></div>`;
+  } else if (up.state === 'installing' || up.state === 'installed') {
+    row = html`<div class="setting"><div class="tile green">${up.state === 'installing' ? html`<span class="spinner"></span>` : ic('check', 18)}</div><div class="grow"><div class="t">${up.state === 'installing' ? `Installing Aster ${u.latest}…` : `Aster ${u.latest} is ready`}</div><div class="d">${up.message || 'Verified against the published checksum.'}</div></div></div>`;
+  } else if (u?.available) {
+    row = html`<div class="setting" style="align-items:flex-start"><div class="tile accent">${ic('download', 18)}</div><div class="grow"><div class="t">Aster ${u.latest} is available</div>
+        <div class="d">You have ${u.current}.${u.publishedAt ? ` Released ${date(u.publishedAt)}.` : ''} ${canInstall ? restartNote : u.kind === 'dev' ? 'Updates install only in the installed app.' : 'Download it from the release page.'}</div>
+        ${notesPreview(u.notes) ? html`<div class="update-notes">${notesPreview(u.notes)}</div>` : ''}</div>
+      <div class="row" style="gap:8px;flex:none"><button class="btn btn-secondary btn-sm" data-action="releasePage">${ic('external', 15)} What's new</button>
+        ${canInstall ? html`<button class="btn btn-primary btn-sm" data-action="installUpdate">${ic('download', 15)} Update now</button>` : ''}</div></div>`;
+  } else if (u) {
+    row = html`<div class="setting"><div class="tile green">${ic('check', 18)}</div><div class="grow"><div class="t">Aster is up to date</div><div class="d">${u.current} is the latest version · checked ${ago(u.checkedAt)}</div></div><button class="btn btn-secondary btn-sm" data-action="checkUpdate">${ic('refresh', 15)} Check again</button></div>`;
+  } else {
+    row = html`<div class="setting"><div class="tile">${ic('refresh', 18)}</div><div class="grow"><div class="t">Aster ${info.version || ''}</div><div class="d">Check GitHub for a newer version. Aster only goes online when you click.</div></div><button class="btn btn-secondary btn-sm" data-action="checkUpdate">${ic('refresh', 15)} Check for updates</button></div>`;
+  }
+  return html`<div class="card" style="margin-top:16px">
+    <div class="card-head"><h3>Updates</h3></div>
+    ${row}
+    ${up.error ? html`<div style="padding:0 20px 16px"><div class="callout amber">${ic('alert', 18)}<div class="grow">${up.error}</div>${up.info?.url ? html`<button class="btn btn-sm btn-secondary" data-action="releasePage">Release page</button>` : ''}</div></div>` : ''}
+  </div>`;
+}
 
 async function save(patch) {
   const s = await api('settings.update', patch);
@@ -37,15 +82,35 @@ export default definePage({
         <div class="setting"><div class="tile green">${ic('shield', 18)}</div><div class="grow"><div class="t">${isMac ? 'Removals go to the Trash' : 'Registry backups are always on'}</div><div class="d">${isMac ? 'Apps, leftovers, launch agents and duplicate files are moved to the Trash, so you can put them back until you empty it.' : 'Every registry fix, edit, startup removal and leftover cleanup is saved as a .reg file you can restore from History.'}</div></div></div>
         <div class="setting"><div class="tile green">${ic('trash', 18)}</div><div class="grow"><div class="t">Your files go to the ${isMac ? 'Trash' : 'Recycle Bin'}</div><div class="d">Files removed from the Disk analyzer, Duplicates and leftover scans are recoverable. Only caches and temporary files are deleted permanently.</div></div></div>
       </div>
+      ${updateCard(info)}
       <div class="card" style="margin-top:16px">
         <div class="card-head"><h3>About</h3></div>
         <div class="setting"><div class="grow"><div class="t">Aster ${info.version || ''}</div><div class="d">Electron ${info.electron || '—'} · made by Nikita Shulga</div></div><button class="btn btn-secondary btn-sm" data-action="github">${ic('external', 15)} GitHub</button></div>
         <div class="setting"><div class="grow"><div class="t">Data folder</div><div class="d mono selectable">${info.dataPath || '—'}</div></div><button class="btn btn-secondary btn-sm" data-action="data">Open</button></div>
       </div>`;
   },
-  onMount() { this.l = () => this.update(); app.listeners.add(this.l); },
-  onUnmount() { app.listeners.delete(this.l); },
+  onMount() { page = this; this.l = () => this.update(); app.listeners.add(this.l); },
+  onUnmount() { page = null; app.listeners.delete(this.l); },
   on: {
+    async checkUpdate() {
+      up.state = 'checking'; up.error = null; refresh();
+      try { up.info = await api('appUpdate.check'); }
+      catch (e) { up.error = e.message; }
+      finally { up.state = 'idle'; refresh(); }
+    },
+    async installUpdate() {
+      up.state = 'downloading'; up.error = null; up.done = 0; up.total = up.info?.asset?.size || 0; refresh();
+      try {
+        await api('appUpdate.download');
+        up.state = 'installing'; refresh();
+        const r = await api('appUpdate.install');
+        up.message = r.message;
+        up.state = r.restarting ? 'installing' : 'installed';
+      } catch (e) { up.error = e.message; up.state = 'idle'; }
+      refresh();
+    },
+    async cancelUpdate() { await api('appUpdate.cancel'); },
+    releasePage() { api('shell.openUrl', {url: up.info?.url || 'https://github.com/Nikita-Shulga/Aster/releases/latest'}); },
     async theme(el) { await save({theme: el.dataset.v}); },
     async flag(el) { await save({[el.dataset.k]: el.checked}); toast('Saved', {type: 'success', timeout: 1500}); },
     async exclude() { const p = await api('settings.pickExclusion'); if (p) await save({exclusions: [...(app.settings.exclusions || []), p]}); },
