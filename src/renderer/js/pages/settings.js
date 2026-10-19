@@ -12,8 +12,14 @@ onEvent(e => {
   if (el) { el.querySelector('.bar-fill').style.width = `${pct(e.done, e.total).toFixed(1)}%`; el.querySelector('[data-update-bytes]').textContent = `${bytes(e.done)} of ${bytes(e.total)}`; }
 });
 
-// First lines of the release notes as plain text: headings and list markers removed.
-const notesPreview = md => String(md || '').split(/\r?\n/).map(l => l.replace(/^#+\s*|^\s*[-*]\s+|\*\*|`/g, '').trim()).filter(l => l && !/^\|/.test(l) && !/^-{3,}$/.test(l)).slice(0, 8).join('\n');
+// First lines of the release notes' "What's new" section (or the whole notes) as plain text, without Markdown marks.
+function notesPreview(md) {
+  const text = String(md || '');
+  const m = /^#+\s*What['’]s new\s*$/im.exec(text);
+  const body = m ? text.slice(m.index + m[0].length).split(/^#{1,2}\s/m)[0] : text;
+  return body.split(/\r?\n/).map(l => l.replace(/^#+\s*|^\s*[-*]\s+/, '').replace(/\*\*|[*_`]/g, '').trim())
+    .filter(l => l && !/^\|/.test(l) && !/^-{3,}$/.test(l)).slice(0, 8).join('\n');
+}
 
 function updateCard(info) {
   const u = up.info;
