@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0 — 2026-10-23
+- **Fix search** (*Tools*): when Windows Search can't find an app you have installed, Aster finds out why and fixes it. It checks that the search service runs, that the index answers and that your Start menu is in it, and it lists the programs Windows Search can't see because they have **no Start menu shortcut**, which is how Windows Search finds apps. These are usually apps on a second drive or left from an earlier Windows, like Epic Games Launcher. Each one shows its icon, publisher, path and drive, with a drive filter and search. Tick the ones you use and Aster adds them to your Start menu (your account only; remove them again from the same card). Also: **Restart search** for a blank or frozen search box (no admin needed), **Turn on** the search service and **Rebuild the index**, both after a Windows permission prompt.
+- **Fix Spotlight** on macOS: the same card checks Spotlight indexing and its index, lists apps in Applications that Spotlight never imported and adds them, and restarts Spotlight or rebuilds its index. It replaces the old *Rebuild Spotlight index* button.
+
 ## 2.4.0 — 2026-10-20
 - **Aster speaks Russian**: *Settings → Language → Interface language* switches between **English** and **Русский** right away, without a restart. Everything is translated — pages, dialogs and messages, the explanation of every cleaner item, registry category, tweak and file type, History entries (older ones too) and the macOS menu bar. Numbers, sizes and dates follow the chosen language (“1,5 ГБ”). English stays the default for new and existing users; Aster never picks the language from the system.
 
