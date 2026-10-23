@@ -3,7 +3,7 @@ import {definePage} from '../page.js';
 import {shared, notify, analyzeCleaner, scanRegistry, checkUpdates, loadRules, cleanableBytes, fixableCount, persistCleaner} from '../state.js';
 import {pendingRecommended} from './optimize.js';
 
-const s = {phase: 'idle', steps: {}, fixed: null, live: null, activity: null, stats: null};
+const s = {phase: 'idle', steps: {}, fixed: null, live: null, activity: null, stats: null, health: null, healthError: false};
 // Smart Scan steps; labels are looked up when drawn so they follow the interface language.
 const STEPS = ['junk', 'registry', 'speed', 'startup', 'updates'];
 const STEP_LABEL = {junk: 'overview.step.junk', registry: isMac ? 'overview.step.leftovers' : 'overview.step.registry', speed: 'overview.step.speed', startup: 'overview.step.startup', updates: 'overview.step.updates'};
@@ -155,6 +155,34 @@ function storageCard() {
   </div>`;
 }
 
+// Drive health (S.M.A.R.T.): what the disks report about themselves, with what to do when one is not well.
+const HEALTH = {good: {tone: 'green', icon: 'check'}, warning: {tone: 'amber', icon: 'alert'}, failing: {tone: 'red', icon: 'alert'}, unknown: {tone: '', icon: 'info'}};
+async function loadHealth(page) {
+  try { s.health = await api('health.disks'); s.healthError = false; } catch { s.healthError = true; }
+  if (page.mounted) page.update();
+}
+function healthCard() {
+  const h = s.health;
+  const head = html`<div class="card-head"><h3 class="grow">${t('overview.health.title')}</h3>${h ? html`<button class="btn btn-ghost btn-sm" data-action="healthInfo">${t('overview.health.what')}</button>` : ''}</div>`;
+  if (s.healthError) return html`<div class="card">${head}<div class="card-pad muted" style="font-size:13px">${t('overview.health.unavailable')}</div></div>`;
+  if (!h) return html`<div class="card">${head}<div class="card-pad"><div class="skeleton" style="height:120px"></div></div></div>`;
+  const bad = h.disks.filter(d => d.verdict === 'warning' || d.verdict === 'failing');
+  return html`<div class="card">${head}
+    ${bad.length ? html`<div class="callout ${bad.some(d => d.verdict === 'failing') ? 'amber' : 'amber'}" style="margin:12px 20px 0">${ic('alert', 16)}<div class="grow">${t('overview.health.backup', {count: bad.length})}</div></div>` : ''}
+    <div class="list">${h.disks.map(d => {
+      const v = HEALTH[d.verdict] || HEALTH.unknown;
+      const facts = [d.wear != null ? t('overview.health.wear', {pct: d.wear}) : '', d.temperature != null ? t('overview.health.temp', {c: d.temperature}) : '', d.hours != null ? t('overview.health.hours', {count: d.hours}) : ''].filter(Boolean);
+      return html`<div class="list-row" style="padding:10px 20px;min-height:0;align-items:flex-start">
+        <span class="tile ${v.tone}" style="width:30px;height:30px;border-radius:8px">${ic('drive', 15)}</span>
+        <div class="grow" style="min-width:0"><div class="truncate" style="font-weight:500">${d.name}</div>
+          <div class="meta">${[t(`overview.health.kind.${d.kind}`), bytes(d.size, 0), d.letters.join(' ')].filter(Boolean).join(' · ')}${facts.length ? ' · ' + facts.join(' · ') : ''}</div></div>
+        <span class="badge ${v.tone}" title="${d.health || ''}">${ic(v.icon, 12)} ${t(`overview.health.${d.verdict}`)}</span>
+      </div>`;
+    })}</div>
+    ${!isMac && !h.details && !h.admin ? html`<div class="card-pad faint" style="font-size:12px;padding-top:4px">${t('overview.health.adminHint')}</div>` : ''}
+  </div>`;
+}
+
 function activityCard() {
   const items = (s.activity || []).slice(0, 5);
   return html`<div class="card">
@@ -179,13 +207,14 @@ export default definePage({
         ${resultCard({page: 'updates', icon: 'refresh', tone: '', value: pending(upd) ? '—' : num(upd), label: t('overview.card.appUpdates'), foot: t(pending(upd) ? (shared.updates.phase === 'error' ? (isMac ? 'overview.card.updatesUnavailableMac' : 'overview.card.wingetUnavailable') : 'overview.card.notChecked') : upd ? 'overview.card.updatesAvailable' : 'overview.card.upToDate')})}
       </div>
       <div class="grid grid-3" style="margin-top:16px">${systemCard()}${storageCard()}${liveCard()}</div>
-      <div style="margin-top:16px">${activityCard()}</div>`;
+      <div class="grid grid-2" style="margin-top:16px">${healthCard()}${activityCard()}</div>`;
   },
   onMount() {
     this.listener = () => this.update();
     shared.listeners.add(this.listener);
     app.listeners.add(this.listener);
     loadActivity(this);
+    if (!s.health) loadHealth(this);
     const tick = async () => {
       try { s.live = await api('system.live'); } catch { return; }
       if (!this.mounted) return;
@@ -199,6 +228,7 @@ export default definePage({
   on: {
     async scan() { await smartScan(this); },
     async fix() { await fixAll(this); },
-    go(el) { window.asterNavigate(el.dataset.page); }
+    go(el) { window.asterNavigate(el.dataset.page); },
+    healthInfo() { modal({title: t('overview.health.title'), icon: 'drive', cancel: null, confirm: t('cleaner.gotIt'), body: th(isMac ? 'overview.health.explainMac' : 'overview.health.explain')}); }
   }
 });

@@ -3,14 +3,12 @@ import {definePage} from '../page.js';
 import {shared, notify, loadRules, usableRule, saveSelection, analyzeCleaner, cleanableBytes, persistCleaner, restoreCleaner} from '../state.js';
 import {chip, resultLine, filterHandlers} from '../filters.js';
 import {bytes as fmtBytes} from '../lib.js';
+import {filesPanel, filesHandlers, filesOpen, resetFiles} from '../cleaner-files.js';
 
 const c = shared.cleaner;
 const open = new Set(['windows']);
 const openResults = new Set();
-const showFiles = new Set();
-const allFiles = new Set();
 const allLocs = new Set();
-const busyFiles = new Set();
 const DEFAULT_FILTERS = {drive: 'all', verdict: 'all', group: 'all', sort: 'size'};
 const cf = structuredClone(DEFAULT_FILTERS);
 const bytesOn = r => cf.drive === 'all' ? r.bytes : (r.locations || []).filter(l => l.drive === cf.drive).reduce((n, l) => n + l.bytes, 0);
@@ -144,17 +142,8 @@ function results() {
               ${(r.locations || []).length > 1 ? html`<td style="width:32px"><button class="icon-btn sm" data-action="cleanLoc" data-id="${r.id}" data-path="${l.path}" title="${t('cleaner.cleanLocation')}" aria-label="${t('cleaner.cleanOnly', {label: l.label})}" ${canClean(r) ? '' : 'disabled'}>${ic('broom', 14)}</button></td>` : ''}
             </tr>`)}</table>
             ${locs.length > 10 && !allLocs.has(r.id) ? html`<div style="margin-top:6px"><button class="linkish" data-action="moreLocs" data-id="${r.id}">${t('cleaner.allLocations', {count: locs.length})}</button></div>` : ''}
-            <div style="margin-top:10px"><button class="linkish" data-action="toggleFiles" data-id="${r.id}">${t(showFiles.has(r.id) ? 'cleaner.hideLargest' : 'cleaner.showLargest')}</button></div>
-            ${showFiles.has(r.id) ? html`<div class="files-peek selectable" style="display:block;padding:6px 0 0">
-              ${(() => {
-                const list = allFiles.has(r.id) ? r.sample : r.sample.slice(0, 12);
-                return html`${list.map(f => html`<div class="f" style="align-items:center"><span class="truncate mono" title="${f.path}">${f.path}</span><span class="num">${bytes(f.size)}</span>
-                  <button class="icon-btn sm" data-action="revealFile" data-path="${f.path}" title="${t(isMac ? 'cleaner.showInFinder' : 'cleaner.showInExplorer')}" aria-label="${t('cleaner.showFile')}">${ic('external', 13)}</button>
-                  <button class="icon-btn sm" data-action="trashFile" data-id="${r.id}" data-path="${f.path}" title="${t(isMac ? 'cleaner.toTrash' : 'cleaner.toBin')}" aria-label="${t('cleaner.deleteFile')}" ${busyFiles.has(f.path) ? 'disabled' : ''}>${busyFiles.has(f.path) ? html`<span class="spinner"></span>` : ic('trash', 13)}</button></div>`)}
-                  ${r.sample.length > 12 && !allFiles.has(r.id) ? html`<div class="f"><button class="linkish" data-action="moreFiles" data-id="${r.id}">${t('cleaner.moreLargest', {count: r.sample.length - 12})}</button></div>` : ''}
-                  ${r.files > list.length ? html`<div class="f"><span>${t('cleaner.smallerFiles', {count: r.files - list.length})}</span></div>` : ''}`;
-              })()}
-            </div>` : ''}
+            <div style="margin-top:12px"><button class="btn btn-secondary btn-sm" data-action="toggleFiles" data-id="${r.id}">${ic(filesOpen(r.id) ? 'chevronDown' : 'list', 14)} ${t(filesOpen(r.id) ? 'cleaner.fb.hide' : 'cleaner.fb.show', {count: r.files})}</button></div>
+            ${filesPanel(r, rule)}
           </div>
         </div>`;
       })}</div>` : empty({iconName: 'check', title: t('cleaner.empty.title'), text: t('cleaner.empty.text')})}
@@ -210,6 +199,7 @@ export default definePage({
     },
     selectRule(el) { el.checked ? c.selected.add(el.dataset.id) : c.selected.delete(el.dataset.id); c.analysis = null; saveSelection(); this.update(); },
     ...filterHandlers(() => cf, DEFAULT_FILTERS),
+    ...filesHandlers,
     filter(el) { cf[el.dataset.key] = el.dataset.key === 'sort' && el.value === 'all' ? 'size' : el.value; this.update(); },
     defaults() { c.selected = new Set(c.rules.filter(r => r.defaultOn).map(r => r.id)); c.analysis = null; saveSelection(); this.update(); },
     ruleInfo(el, e) {
@@ -217,32 +207,9 @@ export default definePage({
       const r = c.rules.find(x => x.id === el.dataset.id);
       modal({title: `${r.app} · ${r.name}`, icon: VERDICTS[r.verdict]?.icon || 'info', cancel: null, confirm: t('cleaner.gotIt'), wide: true, body: explain(r)});
     },
-    toggleFiles(el) { const id = el.dataset.id; showFiles.has(id) ? showFiles.delete(id) : showFiles.add(id); this.update(); },
     openLoc(el) { api('shell.reveal', {path: el.dataset.path}); },
     revealFile(el) { api('shell.reveal', {path: el.dataset.path}); },
     moreLocs(el) { allLocs.add(el.dataset.id); this.update(); },
-    moreFiles(el) { allFiles.add(el.dataset.id); this.update(); },
-    // Removes one file the user picked; it goes to the Trash / Recycle Bin, so it can be put back.
-    async trashFile(el) {
-      const {id, path} = el.dataset;
-      busyFiles.add(path); this.update();
-      try {
-        const res = await api('cleaner.removeFiles', {id, paths: [path]});
-        const r = c.analysis?.results.find(x => x.id === id);
-        if (res.done.length && r) {
-          const f = r.sample.find(x => x.path === path);
-          const size = f?.size || 0;
-          r.sample = r.sample.filter(x => x.path !== path);
-          r.bytes = Math.max(0, r.bytes - size); r.files = Math.max(0, r.files - 1);
-          const loc = (r.locations || []).filter(l => path.startsWith(l.path)).sort((a, b) => b.path.length - a.path.length)[0];
-          if (loc) { loc.bytes = Math.max(0, loc.bytes - size); loc.files = Math.max(0, loc.files - 1); }
-          c.analysis.totalBytes = Math.max(0, c.analysis.totalBytes - size);
-          persistCleaner();
-          toast(t(isMac ? 'cleaner.movedToTrash' : 'cleaner.movedToBin', {size: bytes(size)}), {type: 'success'});
-          notify();
-        } else toast(res.failed[0]?.error || t('cleaner.removeFailed'), {type: 'error'});
-      } finally { busyFiles.delete(path); this.update(); }
-    },
     async cleanLoc(el) {
       const {id, path} = el.dataset;
       const r = c.analysis?.results.find(x => x.id === id);
@@ -251,6 +218,7 @@ export default definePage({
       if (!loc) return;
       const {ok} = await modal({title: t('cleaner.cleanLoc.title', {size: bytes(loc.bytes), label: loc.label}), icon: 'broom', confirm: t('cleaner.cleanNow'), body: html`<p>${th('cleaner.cleanLoc.body', {count: loc.files, path: loc.path, rule: `${rule.app} · ${rule.name}`})}</p><p class="muted" style="margin-top:8px">${rule.ifDeleted}</p>`});
       if (!ok) return;
+      resetFiles();
       c.phase = 'cleaning'; c.progress = {index: 0, total: 1, label: loc.label}; notify();
       try {
         const res = await api('cleaner.clean', {ids: [id], paths: [path], closeApps: !!app.settings?.closeAppsBeforeCleaning});
@@ -263,7 +231,7 @@ export default definePage({
       } finally { c.phase = 'analyzed'; notify(); }
     },
     toggleResult(el) { const id = el.dataset.id; openResults.has(id) ? openResults.delete(id) : openResults.add(id); this.update(); },
-    async analyze() { await analyzeCleaner(); },
+    async analyze() { resetFiles(); await analyzeCleaner(); },
     async cancel() { await api('cleaner.cancel'); },
     reset() { c.lastClean = null; c.analysis = null; notify(); },
     relaunch() { window.asterRelaunch(); },
@@ -287,6 +255,7 @@ export default definePage({
         });
         if (!ok) return;
       }
+      resetFiles();
       c.phase = 'cleaning'; c.progress = {index: 0, total: ids.length, label: t('cleaner.progress.starting')}; notify();
       try {
         const r = await api('cleaner.clean', {ids, drives, closeApps: !!app.settings?.closeAppsBeforeCleaning});

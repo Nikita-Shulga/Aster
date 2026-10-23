@@ -199,9 +199,33 @@ class Cleaner {
   }
 }
 
-// Moves individual files the user picked to the Trash / Recycle Bin. Each file must lie inside one of the
-// rule's own locations, so a forged path can never reach anything else.
-Cleaner.prototype.removeFiles = async function ({id, paths}) {
+// Every file of one item (or of one of its locations), largest first, so single files can be picked and removed.
+// Capped at FILE_LIST files; the item's own clean button still removes everything.
+const FILE_LIST = 5000;
+Cleaner.prototype.listFiles = async function ({id, path: only = null}) {
+  const rule = allRules().find(r => r.id === id);
+  if (!rule) throw new Error(t('cleaner.analyzeAgain'));
+  const targets = (await this.targetsFor(rule)).filter(tg => !only || (tg.dir || tg.file) === only);
+  const ctx = this.ctx(null);
+  let files = [], total = 0, bytes = 0;
+  for (const target of targets) {
+    const where = target.dir || target.file;
+    await walk(target, async (file, st) => {
+      total++; bytes += st.size;
+      files.push({path: file, size: st.size, mtime: st.mtimeMs, loc: where});
+      // Keep memory flat on huge caches: trim back to the largest files now and then.
+      if (files.length > FILE_LIST * 2) { files.sort((a, b) => b.size - a.size); files.length = FILE_LIST; }
+    }, ctx);
+  }
+  files.sort((a, b) => b.size - a.size);
+  if (files.length > FILE_LIST) files.length = FILE_LIST;
+  return {files, total, bytes, truncated: total > files.length, recycleBin: rule.special === 'recyclebin'};
+};
+
+// Removes individual files the user picked: to the Trash / Recycle Bin, or deleted right away (permanent), like
+// cleaning the whole item does. Each file must lie inside one of the rule's own locations, so a forged path can
+// never reach anything else. Files already in the Recycle Bin can only be deleted.
+Cleaner.prototype.removeFiles = async function ({id, paths, permanent = false}) {
   const rule = allRules().find(r => r.id === id);
   if (!rule) throw new Error(t('cleaner.analyzeAgain'));
   const targets = await this.targetsFor(rule);
@@ -209,13 +233,16 @@ Cleaner.prototype.removeFiles = async function ({id, paths}) {
   const inside = p => targets.some(t => t.file ? under(p, [path.resolve(t.file)]) : under(p, [path.resolve(t.dir)]) && p !== path.resolve(t.dir) && (t.recursive || path.dirname(p) === path.resolve(t.dir)) && (!t.match || t.match.test(path.basename(p))) && !(t.exclude && under(p, t.exclude)));
   const done = [], failed = [];
   let freed = 0;
-  for (const raw of (Array.isArray(paths) ? paths : []).slice(0, 500)) {
+  const remove = permanent || rule.special === 'recyclebin'
+    ? async p => { try { await fs.unlink(p); } catch (e) { if (e.code !== 'EPERM' && e.code !== 'EACCES') throw e; await fs.chmod(p, 0o666); await fs.unlink(p); } }
+    : p => this.trash(p);
+  for (const raw of (Array.isArray(paths) ? paths : []).slice(0, FILE_LIST)) {
     const p = typeof raw === 'string' && path.isAbsolute(raw) ? path.resolve(raw) : null;
     if (!p || !inside(p) || (exclusions.length && under(p, exclusions))) { failed.push({path: raw, error: t('cleaner.notPartOfItem')}); continue; }
     try {
       const st = await fs.lstat(p);
       if (!st.isFile()) throw new Error(t('cleaner.notAFile'));
-      await this.trash(p);
+      await remove(p);
       done.push(p); freed += st.size;
     } catch (e) { failed.push({path: p, error: e.message}); }
   }

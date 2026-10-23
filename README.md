@@ -40,12 +40,13 @@
 |  |  |
 | --- | --- |
 | ⚡ **Smart Scan** | One click checks junk, registry or leftovers, optimizations, startup apps and updates. **Fix everything** cleans what is safe and tells you what else is worth a look. |
-| 🧹 **Cleaner that explains itself** | System junk, 8 browsers and dozens of apps. Every item shows where it's stored on which drive, what it contains (“no passwords, bookmarks or logins”), what you'd notice afterwards, and a verdict: **Safe** · **Read first** · **Keep**. |
+| 🧹 **Cleaner that explains itself** | System junk, 8 browsers and dozens of apps. Every item shows where it's stored on which drive, what it contains (“no passwords, bookmarks or logins”), what you'd notice afterwards, and a verdict: **Safe** · **Read first** · **Keep**. **Choose files** lists every file of an item to search, sort and pick from — send them to the Recycle Bin / Trash or delete them. **Automatic cleaning** runs daily or weekly without a window. |
 | 🗂️ **Registry & leftovers** | Windows: a registry cleaner with 13 categories and automatic `.reg` backups, plus a full registry editor. macOS: settings, caches, containers and agents of apps you already deleted. |
 | 📦 **Complete uninstaller** | Runs the real uninstaller (or moves the app to the Trash on a Mac), then sweeps up the folders, settings and registry keys it left behind. Batch uninstall, last-opened dates on Mac. |
 | 🚀 **Startup & optimizer** | Startup apps, tasks, services, login items and launch agents — switched the same way the OS does it. Reversible tweaks with their trade-offs, power plans, apps hogging memory. |
 | 🔄 **Updates** | WinGet on Windows; macOS, Homebrew and App Store updates on a Mac — one app or all at once. |
-| 🧭 **Disk analyzer & duplicates** | Treemap of any drive, file types, the largest files — and for each one, *what it is, which program owns it and whether deleting it breaks anything*. Content-based duplicate finder across drives. |
+| 🧭 **Disk analyzer, duplicates & empty folders** | Treemap of any drive, file types, the largest files — and for each one, *what it is, which program owns it and whether deleting it breaks anything*. Content-based duplicate finder across drives. **Empty folders** finds folders with nothing in them (never system or app folders). |
+| 🩺 **Drive health & repair** | S.M.A.R.T. status of every drive on Overview (wear, temperature and hours when available). Windows: System File Checker, DISM and a drive error scan with live progress and a plain verdict. macOS: First Aid check of the startup disk. |
 | 🔎 **Fix search** | Windows Search or Spotlight can't find an app you have? Aster checks the search service and its index, finds programs search can't see (on Windows: apps with no Start menu shortcut, e.g. on a second drive) and adds them back. Restart or rebuild search in one click. |
 | 🔍 **Filters everywhere** | Drive, size, date, type, publisher, verdict, last opened… Every list can be narrowed down, and every option shows how many items it matches. |
 | ↩️ **Undo-friendly** | Your files go to the Recycle Bin / Trash, registry changes are backed up first, and **History** restores any backup in one click. |

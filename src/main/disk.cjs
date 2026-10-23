@@ -87,6 +87,34 @@ class Disk {
     return {...r, wasted: r.groups.reduce((n, g) => n + g.size * (g.files.length - 1), 0), at: new Date().toISOString()};
   }
 
+  async findEmptyFolders({roots, onProgress}) {
+    const r = await this.run({mode: 'empty', roots: roots.map(checkRoot)}, onProgress);
+    return {...r, at: new Date().toISOString()};
+  }
+
+  // Empty folders go to the Recycle Bin / Trash, and only if they are still empty now (a file may have appeared).
+  async trashEmptyFolders({paths}) {
+    const IGNORABLE = /^(\.ds_store|thumbs\.db|ehthumbs\.db)$/i;
+    const isEmpty = dir => {
+      let entries;
+      try { entries = fs.readdirSync(dir, {withFileTypes: true}); } catch { return false; }
+      return entries.every(e => !e.isSymbolicLink() && (e.isDirectory() ? isEmpty(path.join(dir, e.name)) : e.isFile() && IGNORABLE.test(e.name)));
+    };
+    const ok = [], failed = [];
+    for (const raw of (Array.isArray(paths) ? paths : []).slice(0, 20000)) {
+      const p = typeof raw === 'string' && path.isAbsolute(raw) ? path.resolve(raw) : null;
+      if (!p || p.split(/[\\/]+/).filter(Boolean).length < 2) { failed.push({path: raw, error: t('disk.notEmptyAnymore')}); continue; }
+      let st;
+      try { st = fs.lstatSync(p); } catch { failed.push({path: p, error: t('disk.notEmptyAnymore')}); continue; }
+      if (!st.isDirectory() || !isEmpty(p)) { failed.push({path: p, error: t('disk.notEmptyAnymore')}); continue; }
+      ok.push(p);
+    }
+    const done = [];
+    for (const p of ok) { try { await this.trash(p); done.push(p); } catch (e) { failed.push({path: p, error: e.message}); } }
+    if (done.length) this.store.log({kind: 'trash', key: 'activity.emptyFolders', vars: {count: done.length}, count: done.length});
+    return {done, failed};
+  }
+
   // Deletions from the analyzer and duplicate finder always go to the Recycle Bin.
   async trashPaths({paths}) {
     const done = [], failed = [];

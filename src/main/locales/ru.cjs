@@ -139,5 +139,17 @@ module.exports = {
   'tools.msinfo': 'Сведения о системе',
 
   // ---------- mac ----------
-  'mac.snapshotsRemoved': {one: 'Удалено локальных снимков: до {count}', few: 'Удалено локальных снимков: до {count}', many: 'Удалено локальных снимков: до {count}', other: 'Удалено локальных снимков: до {count}'}
+  'mac.snapshotsRemoved': {one: 'Удалено локальных снимков: до {count}', few: 'Удалено локальных снимков: до {count}', many: 'Удалено локальных снимков: до {count}', other: 'Удалено локальных снимков: до {count}'},
+  'activity.deletedFiles': {one: 'Удалён {count} выбранный файл', few: 'Удалено {count} выбранных файла', many: 'Удалено {count} выбранных файлов', other: 'Удалено {count} выбранного файла'},
+  'disk.notEmptyAnymore': 'Эта папка уже не пустая.',
+  'activity.emptyFolders': {one: 'Убрана {count} пустая папка', few: 'Убраны {count} пустые папки', many: 'Убрано {count} пустых папок', other: 'Убрано {count} пустой папки'},
+  'repair.busy': 'Другое восстановление ещё выполняется. Дождитесь его окончания.',
+  'repair.cancelled': 'Windows не получила разрешения: запрос прав администратора был отменён.',
+  'activity.repair.sfc': 'Проверены системные файлы Windows (SFC)',
+  'activity.repair.dism': 'Восстановлен образ Windows (DISM)',
+  'activity.repair.scan': 'Диск {drive} проверен на ошибки',
+  'activity.repair.fix': 'Запущено исправление ошибок на диске {drive}',
+  'activity.repair.verify': 'Проверен загрузочный диск («Первая помощь»)',
+  'autoClean.notify': 'Автоматическая очистка освободила {size}.',
+  'activity.autoClean': {one: 'Автоматическая очистка удалила {count} файл', few: 'Автоматическая очистка удалила {count} файла', many: 'Автоматическая очистка удалила {count} файлов', other: 'Автоматическая очистка удалила {count} файла'}
 };

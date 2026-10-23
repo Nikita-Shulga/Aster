@@ -1,6 +1,38 @@
 import {html, ic, api, app, setApp, toast, isMac, bytes, bar, pct, date, ago, onEvent, t, th} from '../lib.js';
 import {definePage} from '../page.js';
 import {LANGUAGES, setLanguage} from '../i18n.js';
+import {shared, loadRules} from '../state.js';
+
+// Automatic cleaning (a scheduled task / launch agent that runs Aster without a window).
+const sched = {info: null, busy: false};
+// How many selected Cleaner items the automatic run would clean: Safe ones the user ticked (or the defaults).
+function autoItems() {
+  const rules = shared.cleaner.rules || [];
+  const saved = app.settings?.cleanerSelection;
+  const chosen = new Set(Array.isArray(saved) ? saved : rules.filter(r => r.defaultOn).map(r => r.id));
+  return rules.filter(r => chosen.has(r.id) && r.installed && r.verdict === 'safe' && !r.admin && !r.fda).length;
+}
+function autoCard() {
+  const a = sched.info;
+  if (!a) return html`<div class="card" style="margin-top:16px"><div class="card-head"><h3>${t('settings.auto.title')}</h3></div><div class="card-pad"><div class="skeleton" style="height:60px"></div></div></div>`;
+  const count = autoItems();
+  return html`<div class="card" style="margin-top:16px">
+    <div class="card-head"><h3>${t('settings.auto.title')}</h3></div>
+    <div class="setting"><div class="tile ${a.enabled ? 'green' : ''}">${ic('broom', 18)}</div><div class="grow"><div class="t">${t('settings.auto.enable')}</div>
+      <div class="d">${t('settings.auto.text', {count})} ${a.last ? t('settings.auto.last', {when: ago(a.last.at), size: bytes(a.last.bytes)}) : ''}</div></div>
+      <input type="checkbox" class="switch" data-change="autoEnable" ${a.enabled ? 'checked' : ''} ${sched.busy ? 'disabled' : ''} aria-label="${t('settings.auto.enable')}"></div>
+    ${a.enabled ? html`
+      <div class="setting"><div class="grow"><div class="t">${t('settings.auto.when')}</div><div class="d">${t(a.frequency === 'daily' ? 'settings.auto.dailyText' : 'settings.auto.weeklyText')}</div></div>
+        <div class="segmented">${['daily', 'weekly'].map(v => html`<button class="${a.frequency === v ? 'on' : ''}" data-action="autoFreq" data-v="${v}" ${sched.busy ? 'disabled' : ''}>${t(`settings.auto.${v}`)}</button>`)}</div></div>
+      <div class="setting"><div class="grow"><div class="t">${t('settings.auto.notify')}</div><div class="d">${t('settings.auto.notifyText')}</div></div>
+        <input type="checkbox" class="switch" data-change="autoNotify" ${a.notify ? 'checked' : ''} ${sched.busy ? 'disabled' : ''}></div>` : ''}
+  </div>`;
+}
+async function setSchedule(patch) {
+  sched.busy = true; page?.update();
+  try { sched.info = await api('schedule.set', {...sched.info, ...patch}); toast(t(sched.info.enabled ? 'settings.auto.saved' : 'settings.auto.off'), {type: 'success', timeout: 2500}); }
+  finally { sched.busy = false; page?.update(); }
+}
 
 // Aster's own updates (GitHub releases). Kept outside the page so a download survives navigation.
 const up = {state: 'idle', info: null, error: null, done: 0, total: 0, message: ''};
@@ -89,6 +121,7 @@ export default definePage({
           <div class="row" style="flex-wrap:wrap;margin-top:10px">${(st.exclusions || []).map((p, i) => html`<span class="chip"><span class="mono truncate" style="max-width:360px">${p}</span><button class="icon-btn sm" data-action="unexclude" data-i="${i}" title="${t('common.remove')}">${ic('x', 13)}</button></span>`)}${(st.exclusions || []).length ? '' : html`<span class="faint" style="font-size:12.5px">${t('settings.noExclusions')}</span>`}</div></div>
           <button class="btn btn-secondary btn-sm" data-action="exclude">${ic('plus', 15)} ${t('settings.addFolder')}</button></div>
       </div>
+      ${autoCard()}
       <div class="card" style="margin-top:16px">
         <div class="card-head"><h3>${t('settings.safety')}</h3></div>
         <div class="setting"><div class="tile green">${ic('shield', 18)}</div><div class="grow"><div class="t">${t(isMac ? 'settings.safetyMac' : 'settings.safetyWin')}</div><div class="d">${t(isMac ? 'settings.safetyMacText' : 'settings.safetyWinText')}</div></div></div>
@@ -101,7 +134,10 @@ export default definePage({
         <div class="setting"><div class="grow"><div class="t">${t('settings.dataFolder')}</div><div class="d mono selectable">${info.dataPath || '—'}</div></div><button class="btn btn-secondary btn-sm" data-action="data">${t('common.open')}</button></div>
       </div>`;
   },
-  onMount() { page = this; this.l = () => this.update(); app.listeners.add(this.l); },
+  onMount() {
+    page = this; this.l = () => this.update(); app.listeners.add(this.l);
+    Promise.all([api('schedule.get'), loadRules()]).then(([info]) => { sched.info = info; if (this.mounted) this.update(); }).catch(() => {});
+  },
   onUnmount() { page = null; app.listeners.delete(this.l); },
   on: {
     async checkUpdate() {
@@ -128,6 +164,9 @@ export default definePage({
     async flag(el) { await save({[el.dataset.k]: el.checked}); toast(t('common.saved'), {type: 'success', timeout: 1500}); },
     async exclude() { const p = await api('settings.pickExclusion'); if (p) await save({exclusions: [...(app.settings.exclusions || []), p]}); },
     async unexclude(el) { const list = [...app.settings.exclusions]; list.splice(+el.dataset.i, 1); await save({exclusions: list}); },
+    autoEnable(el) { return setSchedule({enabled: el.checked}); },
+    autoFreq(el) { return setSchedule({frequency: el.dataset.v}); },
+    autoNotify(el) { return setSchedule({notify: el.checked}); },
     github() { api('shell.openUrl', {url: 'https://github.com/Nikita-Shulga/Aster'}); },
     data() { api('backups.openFolder'); }
   }

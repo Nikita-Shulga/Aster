@@ -9,19 +9,20 @@ import startup from './pages/startup.js';
 import updates from './pages/updates.js';
 import disk from './pages/disk.js';
 import duplicates from './pages/duplicates.js';
+import emptyFolders from './pages/empty.js';
 import tools from './pages/tools.js';
 import history from './pages/history.js';
 import settings from './pages/settings.js';
 import optimize from './pages/optimize.js';
 import wsettings from './pages/wsettings.js';
 
-const PAGES = [overview, cleaner, registry, optimize, startup, programs, updates, disk, duplicates, wsettings, tools, history, settings];
+const PAGES = [overview, cleaner, registry, optimize, startup, programs, updates, disk, duplicates, emptyFolders, wsettings, tools, history, settings];
 const NAV = [
   {label: null, items: ['overview']},
   {label: 'nav.clean', items: ['cleaner', 'registry']},
   {label: 'nav.speedUp', items: ['optimize', 'startup']},
   {label: 'nav.manage', items: ['programs', 'updates']},
-  {label: 'nav.storage', items: ['disk', 'duplicates']},
+  {label: 'nav.storage', items: ['disk', 'duplicates', 'empty']},
   {label: 'nav.system', items: ['wsettings', 'tools', 'history']}
 ];
 const byId = Object.fromEntries(PAGES.map(p => [p.id, p]));

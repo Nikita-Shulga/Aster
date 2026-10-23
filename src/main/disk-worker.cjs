@@ -146,8 +146,60 @@ function duplicates(roots, minSize) {
   return {groups: groups.slice(0, 5000), files, bytes};
 }
 
+// Folders with nothing in them (or only .DS_Store / Thumbs.db), reported at their top-most empty level. System
+// trees, AppData / Library, hidden folders (.git, .config…) and the standard folders of a user profile are never
+// offered: apps and the OS expect those to exist even when empty.
+const IGNORABLE = /^(\.ds_store|thumbs\.db|ehthumbs\.db)$/i;
+const SKIP_EMPTY = MAC
+  ? /^\/(System|Library|Applications|private|usr|bin|sbin|opt|Volumes|dev|cores)(\/|$)|^\/Users\/[^/]+\/Library(\/|$)|\.(app|bundle|framework|photoslibrary|musiclibrary)(\/|$)/i
+  : /^[a-z]:\\(windows|\$recycle\.bin|system volume information|program files|program files \(x86\)|programdata|recovery|\$windows\.~bt|\$winreagent|msocache|intel|amd|nvidia)(\\|$)|^[a-z]:\\users\\[^\\]+\\appdata(\\|$)/i;
+const PROFILE_CHILD = MAC ? /^\/Users\/[^/]+\/[^/]+$/ : /^[a-z]:\\users\\[^\\]+\\[^\\]+$/i;
+const PROFILE = MAC ? /^\/Users\/[^/]+$/ : /^[a-z]:\\users\\[^\\]+$/i;
+function emptyFolders(roots) {
+  const found = [];
+  let dirs = 0, guard = true;
+  // Returns true when dir holds no files at any depth.
+  const walk = dir => {
+    let entries;
+    try { entries = fs.readdirSync(dir, {withFileTypes: true}); } catch { return false; }
+    dirs++; current = dir;
+    progress(false, {phase: 'empty', dirs, found: found.length});
+    let empty = true;
+    const emptyKids = [];
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isSymbolicLink()) { empty = false; continue; }
+      if (e.isDirectory()) {
+        if (e.name.startsWith('.') || (guard && SKIP_EMPTY.test(rel(full))) || SKIP_ALWAYS.test(rel(full))) { empty = false; continue; }
+        if (walk(full)) emptyKids.push(full); else empty = false;
+      } else if (!(e.isFile() && IGNORABLE.test(e.name))) empty = false;
+    }
+    // A folder that is not empty as a whole reports its empty subfolders (offerable ones only).
+    if (!empty) for (const k of emptyKids) offer(k);
+    return empty;
+  };
+  const offer = dir => {
+    const r = rel(dir);
+    const depth = r.split(/[\\/]+/).filter(Boolean).length;
+    if (depth < (MAC ? 2 : 3) || PROFILE.test(r)) return;
+    // A standard profile folder (Videos, Saved Games, Public…) is kept, but empty folders inside it are offered.
+    if (PROFILE_CHILD.test(r)) { for (const e of safeList(dir)) if (e.isDirectory() && !e.isSymbolicLink()) offer(path.join(dir, e.name)); return; }
+    let mtime = 0, nested = 0;
+    try { mtime = fs.statSync(dir).mtimeMs; } catch {}
+    const count = d => { for (const e of safeList(d)) if (e.isDirectory() && !e.isSymbolicLink()) { nested++; count(path.join(d, e.name)); } };
+    count(dir);
+    found.push({path: dir, mtime, nested});
+  };
+  const safeList = d => { try { return fs.readdirSync(d, {withFileTypes: true}); } catch { return []; } };
+  // A folder the user picked inside AppData or Library is searched as asked; the guard only protects whole drives.
+  for (const r of roots) { guard = !SKIP_EMPTY.test(rel(r)); if (walk(r)) offer(r); }
+  progress(true, {phase: 'done', dirs, found: found.length});
+  found.sort((a, b) => a.path.localeCompare(b.path));
+  return {folders: found.slice(0, 20000), dirs};
+}
+
 try {
-  const result = workerData.mode === 'duplicates' ? duplicates(workerData.roots, workerData.minSize) : analyze(workerData.root);
+  const result = workerData.mode === 'duplicates' ? duplicates(workerData.roots, workerData.minSize) : workerData.mode === 'empty' ? emptyFolders(workerData.roots) : analyze(workerData.root);
   parentPort.postMessage({type: 'done', result});
 } catch (e) {
   parentPort.postMessage({type: 'error', message: e.message});

@@ -140,5 +140,17 @@ module.exports = {
   'tools.msinfo': 'System Information',
 
   // ---------- mac ----------
-  'mac.snapshotsRemoved': {one: 'Removed up to {count} local snapshot', other: 'Removed up to {count} local snapshots'}
+  'mac.snapshotsRemoved': {one: 'Removed up to {count} local snapshot', other: 'Removed up to {count} local snapshots'},
+  'activity.deletedFiles': {one: 'Deleted {count} chosen file', other: 'Deleted {count} chosen files'},
+  'disk.notEmptyAnymore': 'This folder is not empty anymore.',
+  'activity.emptyFolders': {one: 'Removed {count} empty folder', other: 'Removed {count} empty folders'},
+  'repair.busy': 'Another repair is still running. Wait until it finishes.',
+  'repair.cancelled': 'Windows did not get permission: the administrator prompt was cancelled.',
+  'activity.repair.sfc': 'Checked Windows system files (SFC)',
+  'activity.repair.dism': 'Repaired the Windows image (DISM)',
+  'activity.repair.scan': 'Checked drive {drive} for errors',
+  'activity.repair.fix': 'Started fixing errors on drive {drive}',
+  'activity.repair.verify': 'Checked the startup disk (First Aid)',
+  'autoClean.notify': 'Automatic cleaning freed {size}.',
+  'activity.autoClean': {one: 'Automatic cleaning removed {count} file', other: 'Automatic cleaning removed {count} files'}
 };

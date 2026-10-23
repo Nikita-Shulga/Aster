@@ -126,6 +126,16 @@ const api = {
     return {results, totalBytes: results.reduce((n, r) => n + r.bytes, 0), totalFiles: results.reduce((n, r) => n + r.files, 0)};
   },
   'cleaner.clean': async ({ids}) => { for (let i = 0; i < ids.length; i++) { emit({channel: 'cleaner', index: i, total: ids.length, label: ids[i]}); await wait(120); } const freed = ids.reduce((n, id) => n + (rules.find(r => r.id === id)?.bytes || 0), 0); return {results: [], freed, deleted: Math.round(freed / 180000), skipped: 37}; },
+  'cleaner.listFiles': async ({id}) => {
+    await wait(400);
+    const r = rules.find(x => x.id === id);
+    const base = `C:\\Users\\Alex\\AppData\\Local\\${r.app}\\Cache`;
+    const names = ['data_1', 'data_2', 'index', 'f_000a1c', 'f_000b37', 'f_00c2d9', 'thumbs.db', 'session.log', 'blob_store.bin', 'shader_cache.bin'];
+    const files = Array.from({length: 240}, (_, i) => ({path: `${base}\\${i % 3 ? 'Cache_Data' : 'Code Cache\\js'}\\${names[i % names.length]}${i >= names.length ? '_' + i : ''}`, size: Math.round(r.bytes / (i + 2) / 4), mtime: Date.now() - i * 36e5 * 7, loc: base}))
+      .sort((a, b) => b.size - a.size);
+    return {files, total: files.length, bytes: files.reduce((n, f) => n + f.size, 0), truncated: false, recycleBin: id === 'windows.recyclebin'};
+  },
+  'cleaner.removeFiles': async ({paths}) => { await wait(300); return {done: paths, failed: [], freed: 0}; },
   'cleaner.relabel': ({analysis}) => relabel(analysis),
   'cleaner.cancel': () => ({ok: true}),
   'registry.categories': () => cats.map(id => ({id, name: catNames[id], description: L('References to files or programs that no longer exist.', 'Ссылки на файлы и программы, которых больше нет.'), verdict: ['extensions', 'com', 'installer'].includes(id) ? 'review' : 'safe', defaultOn: !['extensions', 'com', 'installer'].includes(id), contains: L('Entries left behind by programs that were removed.', 'Записи, оставшиеся после удалённых программ.'), ifDeleted: L('Nothing visible; Windows stops referring to missing files.', 'Внешне ничего не изменится: Windows перестанет обращаться к отсутствующим файлам.'), advice: L('Safe housekeeping.', 'Безопасная чистка.')})),
@@ -170,6 +180,32 @@ const api = {
     settings: MAC ? [['storage', L('Storage', 'Хранилище'), 'pie'], ['update', L('Software Update', 'Обновление ПО'), 'refresh'], ['loginitems', L('Login Items', 'Объекты входа'), 'power']] : [['storage', L('Storage Sense', 'Контроль памяти'), 'pie'], ['update', L('Windows Update', 'Центр обновления Windows'), 'refresh']], binRule: MAC ? 'macos.trash' : 'windows.recyclebin'}),
   'tools.run': async () => { await wait(500); return {ok: true, message: L('Done', 'Готово')}; },
   'tools.launch': () => ({ok: true}), 'tools.flushDns': async () => { await wait(500); return {ok: true}; }, 'tools.restorePoint': () => ({ok: true}),
+  'health.disks': async () => { await wait(500); return MAC
+    ? {admin: true, details: false, disks: [{id: 'disk0', name: 'APPLE SSD AP0512Z', size: 500.3e9, letters: [], kind: 'nvme', health: 'Verified', verdict: 'good'}, {id: 'disk4', name: 'Samsung Portable SSD T7', size: 1e12, letters: [], kind: 'usb', health: 'Not Supported', verdict: 'unknown'}]}
+    : {admin: false, details: false, disks: [{id: '0', name: 'Samsung SSD 990 PRO 2TB', size: 2e12, letters: ['C:'], kind: 'nvme', health: 'Healthy', verdict: 'good'}, {id: '1', name: 'WDC WD20EZRZ', size: 2e12, letters: ['D:'], kind: 'hdd', health: 'Warning', verdict: 'warning'}]}; },
+  'repair.run': async ({id}) => {
+    for (let p = 0; p <= 100; p += 20) { emit({channel: 'repair', id, pct: id === 'verify' || id === 'scan' ? null : p, line: id === 'verify' ? 'Checking the fsroot tree' : ''}); await wait(250); }
+    return {id, state: id === 'scan' ? 'problems' : id === 'sfc' ? 'repaired' : id === 'fix' ? 'scheduled' : 'ok', repaired: 3};
+  },
+  'repair.status': () => ({running: null}),
+  'schedule.get': () => mockSchedule,
+  'schedule.set': async p => { await wait(400); Object.assign(mockSchedule, {enabled: !!p.enabled, frequency: p.frequency === 'daily' ? 'daily' : 'weekly', notify: p.notify !== false}); return mockSchedule; },
+  'system.home': () => MAC ? '/Users/alex' : 'C:\\Users\\Alex',
+  'disk.emptyFolders': async () => {
+    await wait(900);
+    const home = MAC ? '/Users/alex' : 'C:\\Users\\Alex';
+    const j = (...p) => [home, ...p].join(MAC ? '/' : '\\');
+    const day = 864e5;
+    return {dirs: 7949, at: new Date().toISOString(), folders: [
+      {path: j('Documents', 'Adobe', 'After Effects 2022', 'User Libraries'), mtime: Date.now() - 400 * day, nested: 0},
+      {path: j('Documents', 'Old project', 'build'), mtime: Date.now() - 90 * day, nested: 3},
+      {path: j('Downloads', 'setup_unpacked'), mtime: Date.now() - 45 * day, nested: 1},
+      {path: j('Desktop', 'New folder'), mtime: Date.now() - 200 * day, nested: 0},
+      {path: j('Documents', 'Codex', '2026-10-21'), mtime: Date.now() - 2 * day, nested: 2},
+      {path: MAC ? '/Volumes/Backup/Photos/2019/Empty' : 'D:\\Photos\\2019\\Empty', mtime: Date.now() - 900 * day, nested: 0}
+    ]};
+  },
+  'disk.trashEmpty': async ({paths}) => { await wait(300); return {done: paths, failed: []}; },
   'search.check': async () => {
     await wait(900);
     const app = (name, exe, company, likely = true, extra = {}) => ({id: exe, name, exe, folder: exe.replace(/\\[^\\]+$/, ''), drive: MAC ? null : exe.slice(0, 2), company, likely, icon: null, ...extra});
@@ -212,6 +248,7 @@ const MOCK_TWEAKS = [
   TW('clipboardHistory', 'taskbar', L('Clipboard history (Win+V)', 'Журнал буфера обмена (Win+V)'), false, true, 'recommended')
 ];
 const mockSearch = {added: []};
+const mockSchedule = {enabled: false, frequency: 'weekly', notify: true, last: null, installed: false};
 const power = {plans: [{guid: '381b4222-f694-41f0-9685-ff5bb260df2e', name: L('Balanced', 'Сбалансированная'), active: true}, {guid: 'a1841308-3541-4fab-bc81-f71556f20b4a', name: L('Power saver', 'Экономия энергии'), active: false}], screenAc: 600, screenDc: 300, sleepAc: 1800, sleepDc: 900, battery: false};
 
 export const mockApi = {

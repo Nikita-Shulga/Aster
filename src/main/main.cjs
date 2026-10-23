@@ -8,6 +8,7 @@ const {Cleaner} = require('./cleaner.cjs');
 const {Disk} = require('./disk.cjs');
 const {Updater} = require('./updater.cjs');
 const {ScanCache, pruneDuplicates} = require('./scans.cjs');
+const {Schedule, runAutoClean} = require('./schedule.cjs');
 const i18n = require('./i18n.cjs');
 const {t, tdLabel, tError} = i18n;
 
@@ -23,7 +24,9 @@ const P = isMac ? {
   identify: require('./mac/identify.cjs').identify,
   Tweaks: require('./mac/tweaks.cjs').MacTweaks,
   Display: require('./mac/display.cjs').MacDisplay,
-  Search: require('./mac/search.cjs').MacSearch
+  Search: require('./mac/search.cjs').MacSearch,
+  health: require('./mac/health.cjs'),
+  Repair: require('./mac/repair.cjs').MacRepair
 } : {
   system: require('./system.cjs'),
   Registry: require('./registry.cjs').Registry,
@@ -34,13 +37,16 @@ const P = isMac ? {
   identify: require('./identify.cjs').identify,
   Tweaks: require('./tweaks.cjs').Tweaks,
   Display: require('./display.cjs').Display,
-  Search: require('./search.cjs').Search
+  Search: require('./search.cjs').Search,
+  health: require('./health.cjs'),
+  Repair: require('./repair.cjs').Repair
 };
 const {system, identify} = P;
 const FDA_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles';
 
 const RENDERER = path.join(__dirname, '..', 'renderer', 'index.html');
 const relaunched = process.argv.includes('--aster-relaunch');
+const autoClean = process.argv.includes('--auto-clean');
 let win = null;
 
 app.setAppUserModelId('com.nikitashulga.aster');
@@ -134,6 +140,28 @@ function appMenu() {
 // renamed when the language changes (older saves have only the English label).
 const relabel = analysis => ({...analysis, results: (analysis?.results || []).map(r => ({...r, locations: (r.locations || []).map(l => ({...l, key: l.key ?? l.label, label: tdLabel(l.key ?? l.label)}))}))});
 
+// Scheduled cleaning: no window, no single-instance lock (if Aster is open, the run is skipped so it never cleans
+// behind your back while you look at results). Cleans, logs to History, optionally notifies, quits.
+async function autoCleanMain() {
+  if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+  await app.whenReady();
+  const store = new Store(app.getPath('userData'));
+  i18n.setLanguage(store.getSettings().language);
+  const cleaner = new Cleaner({getSettings: () => store.getSettings(), getDrives: async () => (await system.info()).drives, trash});
+  try {
+    const info = await system.info().catch(() => ({}));
+    const fda = isMac ? require('./mac/sh.cjs').hasFullDiskAccess() : true;
+    const r = await runAutoClean({store, cleaner, admin: !!info.admin, fda});
+    const {Notification} = require('electron');
+    if (r && r.freed > 0 && store.getSettings().autoClean?.notify !== false && Notification.isSupported()) {
+      const bytes = n => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return `${n.toLocaleString(i18n.locale(), {maximumFractionDigits: i ? 1 : 0})} ${i18n.getLanguage() === 'ru' ? ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'][i] : u[i]}`; };
+      const n = new Notification({title: 'Aster', body: t('autoClean.notify', {size: bytes(r.freed)}), silent: true});
+      n.show();
+      await new Promise(res => setTimeout(res, 4000));
+    }
+  } finally { app.quit(); }
+}
+
 async function main() {
   if (!(await acquireLock())) { app.quit(); return; }
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
@@ -154,6 +182,8 @@ async function main() {
   const tweaks = new P.Tweaks({store, buildNumber: async () => (sysInfo || (sysInfo = await system.info())).build || 0});
   const display = new P.Display({store});
   const search = new P.Search({store, getIcon, getDrives, trash});
+  const repair = new P.Repair({store, send: p => send('repair', p)});
+  const schedule = new Schedule({app, store});
   const updater = new Updater({app, shell, store, onProgress: p => send('appUpdate', p)});
   setTimeout(() => updater.cleanup(), 60000); // after an update, give the installer time to exit first
 
@@ -163,6 +193,8 @@ async function main() {
     'app.info': () => ({version: app.getVersion(), name: app.getName(), electron: process.versions.electron, dataPath: app.getPath('userData')}),
     'system.info': async a => (sysInfo = await system.info({refresh: !!a?.refresh})),
     'system.live': () => system.live(),
+    'system.home': () => require('node:os').homedir(),
+    'health.disks': () => P.health.disks(),
     'system.openFullDiskAccess': async () => { if (isMac) await shell.openExternal(FDA_URL); return {ok: true}; },
     'system.relaunchAdmin': async () => {
       if (isMac) { await shell.openExternal(FDA_URL); return {ok: true}; }
@@ -198,10 +230,14 @@ async function main() {
       return r;
     },
     'cleaner.removeFiles': async a => {
-      const r = await cleaner.removeFiles({id: String(a?.id || ''), paths: a?.paths});
-      if (r.done.length) store.log({kind: 'trash', key: isMac ? 'activity.trashedFilesTrash' : 'activity.trashedFilesBin', vars: {count: r.done.length}, bytes: r.freed, count: r.done.length});
+      const permanent = a?.permanent === true;
+      const r = await cleaner.removeFiles({id: String(a?.id || ''), paths: a?.paths, permanent});
+      if (r.done.length) store.log(permanent
+        ? {kind: 'clean', key: 'activity.deletedFiles', vars: {count: r.done.length}, bytes: r.freed, count: r.done.length}
+        : {kind: 'trash', key: isMac ? 'activity.trashedFilesTrash' : 'activity.trashedFilesBin', vars: {count: r.done.length}, bytes: r.freed, count: r.done.length});
       return r;
     },
+    'cleaner.listFiles': a => cleaner.listFiles({id: String(a?.id || ''), path: typeof a?.path === 'string' ? a.path : null}),
     'cleaner.cancel': () => { cleaner.cancel(); return {ok: true}; },
 
     'registry.categories': () => registry.categories(),
@@ -271,6 +307,8 @@ async function main() {
       return identify({items: (a.items || []).filter(i => i && typeof i.path === 'string').slice(0, 400), programs: [...programs.items.values()]});
     },
     'disk.cancel': () => disk.cancel(),
+    'disk.emptyFolders': a => disk.findEmptyFolders({roots: Array.isArray(a?.roots) ? a.roots : [], onProgress: p => send('empty', p)}),
+    'disk.trashEmpty': a => disk.trashEmptyFolders({paths: a?.paths}),
     'disk.trash': a => disk.trashPaths({paths: (a.paths || []).filter(p => typeof p === 'string' && path.isAbsolute(p) && path.parse(p).root !== path.resolve(p))}),
 
     'tweaks.list': a => tweaks.list({groups: Array.isArray(a?.groups) ? a.groups : []}),
@@ -288,6 +326,10 @@ async function main() {
     'tools.launch': a => tools.launch(a),
     'tools.flushDns': () => tools.flushDns(),
     'tools.restorePoint': a => tools.restorePoint(a),
+    'schedule.get': () => schedule.get(),
+    'schedule.set': a => schedule.set({enabled: a?.enabled === true, frequency: String(a?.frequency || ''), notify: a?.notify !== false}),
+    'repair.run': a => repair.run({id: String(a?.id || ''), drive: typeof a?.drive === 'string' ? a.drive : null}),
+    'repair.status': () => repair.status(),
     'search.check': () => search.check(),
     'search.addApps': a => search.addApps({ids: Array.isArray(a?.ids) ? a.ids.filter(x => typeof x === 'string').slice(0, 200) : []}),
     'search.removeAdded': () => search.removeAdded(),
@@ -333,6 +375,7 @@ async function main() {
   if (!app.isPackaged && process.env.ASTER_SELFTEST) require('../../scripts/selftest.cjs')(win, process.env.ASTER_SELFTEST).finally(() => app.quit());
 }
 
-main().catch(e => { dialog.showErrorBox(t('main.couldNotStart'), String(e?.stack || e)); app.quit(); });
-app.on('window-all-closed', () => app.quit());
+if (autoClean) autoCleanMain().catch(() => app.quit());
+else main().catch(e => { dialog.showErrorBox(t('main.couldNotStart'), String(e?.stack || e)); app.quit(); });
+app.on('window-all-closed', () => { if (!autoClean) app.quit(); });
 app.on('activate', () => { if (win) win.show(); });

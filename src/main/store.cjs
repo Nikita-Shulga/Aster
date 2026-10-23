@@ -27,7 +27,8 @@ const DEFAULT_SETTINGS = {
   registryCategories: null,    // null = all safe categories
   largeFileMinMB: 100,
   duplicateMinKB: 1024,
-  sidebarCollapsed: false
+  sidebarCollapsed: false,
+  autoClean: null             // {enabled, frequency: 'daily' | 'weekly', notify}; set through schedule.cjs
 };
 
 class Store {
@@ -50,6 +51,7 @@ class Store {
       if (k === 'exclusions') next[k] = Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.length < 1024).slice(0, 200) : [];
       else if (k === 'theme') next[k] = ['system', 'light', 'dark'].includes(v) ? v : 'system';
       else if (k === 'language') next[k] = isLanguage(v) ? v : 'en';
+      else if (k === 'autoClean') next[k] = v && typeof v === 'object' ? {enabled: v.enabled === true, frequency: v.frequency === 'daily' ? 'daily' : 'weekly', notify: v.notify !== false} : null;
       else if (typeof DEFAULT_SETTINGS[k] === 'boolean') next[k] = v === true;
       else if (typeof DEFAULT_SETTINGS[k] === 'number') next[k] = Number.isFinite(+v) && +v > 0 ? +v : DEFAULT_SETTINGS[k];
       else next[k] = v;
