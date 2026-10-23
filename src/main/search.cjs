@@ -4,7 +4,7 @@
 // Start menu entry (common for apps on a second drive or left from an earlier Windows install) and fixes what it can.
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
-const path = require('node:path');
+const path = require('node:path').win32; // Windows paths, also when tests run on macOS
 const os = require('node:os');
 const crypto = require('node:crypto');
 const {psJson, powershell} = require('./ps.cjs');
