@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.6.0 — 2026-10-23
 - **Choose single files in Cleaner**: every item has *Choose files*, which lists all its files (the largest 5,000) with search, sorting (largest, newest, oldest, name) and a location filter. Tick any files — or all that match — and send them to the Recycle Bin / Trash, or delete them right away like a normal clean. Before, only the 40 largest files could be removed, one at a time.
 - **Automatic cleaning** (*Settings*): every day or every week Aster cleans the Cleaner items you selected that are marked *Safe*, without opening a window. Running apps are skipped, the result appears in History, and an optional notification says how much was freed. A missed run starts as soon as the computer is on. Uses a scheduled task on Windows and a launch agent on macOS; turning it off removes them.
 - **Empty folders** (*Storage*): finds folders with nothing in them (or only Thumbs.db / .DS_Store) on a drive, in your home folder or any folder, shown at their top-most empty level with a drive and age filter. They go to the Recycle Bin / Trash and are checked again first. System folders, Program Files / Applications, AppData / Library, hidden folders and the standard folders of your profile are never offered.
