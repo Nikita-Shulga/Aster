@@ -638,3 +638,17 @@ textarea.input { height: auto; padding: 8px 11px; resize: vertical; font-family:
 .rp-item { padding: 14px 20px; border-bottom: 1px solid var(--border); }
 .rp-item:last-child { border-bottom: 0; }
 .rp-item .meta { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
+
+/* What's new */
+.wn-list { display: grid; gap: 12px; max-width: 860px; }
+.wn { padding: 18px 20px; }
+.wn.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+.wn-head { display: flex; align-items: center; gap: 14px; }
+.wn-head h3 { font-size: 15px; }
+.wn-head .sub { color: var(--text-3); font-size: 12.5px; margin-top: 2px; }
+.wn-version { flex: none; min-width: 64px; text-align: center; padding: 6px 10px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-text); font-weight: 700; font-size: 13px; }
+.wn-items { margin: 12px 0 0; padding-left: 96px; display: grid; gap: 7px; color: var(--text-2); font-size: 13.5px; line-height: 1.5; }
+.wn-items li { padding-left: 2px; }
+.wn-items li .badge { margin-left: 8px; vertical-align: 1px; }
+.wn-items li.other-os { color: var(--text-3); }
+@media (max-width: 900px) { .wn-items { padding-left: 18px; } }

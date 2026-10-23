@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.7.0 — 2026-10-23
+- **What's new** (*System → What's new*): every version of Aster summed up in a few short lines, in English or Russian, newest first. Changes for only one platform are marked *Windows* or *macOS*. After an update the page is marked **New** in the sidebar until you open it; *Full changelog* opens this file on GitHub.
+
 ## 2.6.0 — 2026-10-23
 - **Choose single files in Cleaner**: every item has *Choose files*, which lists all its files (the largest 5,000) with search, sorting (largest, newest, oldest, name) and a location filter. Tick any files — or all that match — and send them to the Recycle Bin / Trash, or delete them right away like a normal clean. Before, only the 40 largest files could be removed, one at a time.
 - **Automatic cleaning** (*Settings*): every day or every week Aster cleans the Cleaner items you selected that are marked *Safe*, without opening a window. Running apps are skipped, the result appears in History, and an optional notification says how much was freed. A missed run starts as soon as the computer is on. Uses a scheduled task on Windows and a launch agent on macOS; turning it off removes them.

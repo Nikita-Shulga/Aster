@@ -1215,5 +1215,11 @@ export default {
   'settings.auto.notify': 'Уведомлять после очистки',
   'settings.auto.notifyText': 'Короткое уведомление о том, сколько места освобождено. Если очищать было нечего, ничего не показывается.',
   'settings.auto.saved': 'Автоматическая очистка включена',
-  'settings.auto.off': 'Автоматическая очистка выключена'
+  'settings.auto.off': 'Автоматическая очистка выключена',
+  'page.whatsnew': 'Что нового',
+  'whatsnew.badge': 'Новое',
+  'whatsnew.intro': 'У вас Aster {version}. Здесь — что менялось в каждой версии, начиная с последней.',
+  'whatsnew.full': 'Полный список изменений',
+  'whatsnew.installed': 'Установлена',
+  'whatsnew.coming': 'Скоро'
 };

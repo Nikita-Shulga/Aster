@@ -14,7 +14,7 @@ const emit = e => { const v = loc(e); listeners.forEach(fn => fn(v)); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const GB = 1024 ** 3, MB = 1024 ** 2;
 
-let settings = {language: 'en', theme: 'system', closeAppsBeforeCleaning: false, confirmBeforeCleaning: true, exclusions: [], cleanerSelection: null, registryCategories: null};
+let settings = {language: 'en', theme: 'system', closeAppsBeforeCleaning: false, confirmBeforeCleaning: true, exclusions: [], cleanerSelection: null, registryCategories: null, seenVersion: '2.5.0'};
 const activity = [
   {id: 'a1', at: new Date(Date.now() - 864e5 * 2).toISOString(), kind: 'clean', title: L('Cleaned 18,204 files', 'Удалено 18\u00a0204 ненужных файла'), bytes: 3.1 * GB},
   {id: 'a2', at: new Date(Date.now() - 864e5 * 2).toISOString(), kind: 'registry', title: L('Fixed 212 registry issues', 'Исправлено 212 проблем в реестре'), count: 212, backup: 'x.reg', backupExists: true},
@@ -105,7 +105,7 @@ const api = {
   'disk.last': async () => ({...await api['disk.analyze'](), at: earlier(), restored: true}),
   'scans.load': async ({kind}) => { const saved = savedScans.get(kind); if (saved && kind === 'cleaner') return {...saved, data: relabel(saved.data)}; return saved || (kind === 'duplicates' ? {v: 1, savedAt: earlier(), data: {...await api['disk.duplicates'](), root: 'C:\\', roots: ['C:\\'], minSize: MB, at: earlier()}} : null); },
   'scans.save': ({kind, data}) => { if (data == null) savedScans.delete(kind); else savedScans.set(kind, {v: 1, savedAt: new Date().toISOString(), data: structuredClone(data)}); return {ok: true}; },
-  'app.info': () => ({version: '1.0.0', electron: '44.8.0', dataPath: 'C:\\Users\\Alex\\AppData\\Roaming\\Aster'}),
+  'app.info': () => ({version: '2.7.0', electron: '44.8.0', dataPath: 'C:\\Users\\Alex\\AppData\\Roaming\\Aster'}),
   'system.info': () => MAC ? ({os: 'macOS Sequoia', osVersion: '15.6 (24G84)', build: 15, arch: 'arm64', hostname: 'Alex-MacBook-Pro', user: 'alex', model: 'MacBook Pro (Mac15,6)', cpu: 'Apple M3 Pro', cores: 12, gpu: ['Apple M3 Pro'], admin: false, mac: true, fda: false, memory: {total: 18 * GB, free: 3.1 * GB}, uptime: 302000, cpuLoad: 9,
     drives: [{name: 'Macintosh HD', root: '/', label: 'Macintosh HD', format: 'APFS', type: 'Fixed', total: 994 * GB, free: 212 * GB}, {name: 'Backup', root: '/Volumes/Backup', label: 'Backup', type: 'Removable', total: 2000 * GB, free: 1210 * GB}]}) : ({os: 'Windows 11 Pro', osVersion: L('25H2 (build 26200.6899)', '25H2 (сборка 26200.6899)'), arch: 'x64', hostname: 'ALEX-DESKTOP', user: 'alex', model: 'ASUS ROG Strix G16', cpu: 'AMD Ryzen 9 7945HX with Radeon Graphics', cores: 32, gpu: ['NVIDIA GeForce RTX 4070 Laptop GPU'], admin: false, memory: {total: 32 * GB, free: 13.4 * GB}, uptime: 192000, cpuLoad: 14,
     drives: [{name: 'C:', label: 'Windows', format: 'NTFS', type: 'Fixed', total: 1000 * GB, free: 214 * GB}, {name: 'D:', label: 'Data', format: 'NTFS', type: 'Fixed', total: 2000 * GB, free: 1480 * GB}]}),

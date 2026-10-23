@@ -1214,5 +1214,11 @@ export default {
   'settings.auto.notify': 'Notify me after cleaning',
   'settings.auto.notifyText': 'A short notification with how much space was freed. Nothing is shown when there was nothing to clean.',
   'settings.auto.saved': 'Automatic cleaning is on',
-  'settings.auto.off': 'Automatic cleaning is off'
+  'settings.auto.off': 'Automatic cleaning is off',
+  'page.whatsnew': 'What’s new',
+  'whatsnew.badge': 'New',
+  'whatsnew.intro': 'You have Aster {version}. Here is what changed in every version, newest first.',
+  'whatsnew.full': 'Full changelog',
+  'whatsnew.installed': 'Installed',
+  'whatsnew.coming': 'Coming next'
 };
