@@ -53,6 +53,13 @@ module.exports = {
   'activity.purge': 'Freed inactive memory',
   'activity.trashEmptied': 'Emptied the Trash',
   'activity.launchServices': 'Rebuilt the Launch Services database',
+  'activity.searchShortcuts': {one: 'Added {count} app to the Start menu so Windows Search finds it', other: 'Added {count} apps to the Start menu so Windows Search finds them'},
+  'activity.searchShortcutsRemoved': {one: 'Removed {count} Start menu shortcut Aster had added', other: 'Removed {count} Start menu shortcuts Aster had added'},
+  'activity.searchRestarted': 'Restarted search',
+  'activity.searchRebuilt': 'Started rebuilding the Windows Search index',
+  'activity.searchServiceOn': 'Turned the Windows Search service back on',
+  'activity.spotlightOn': 'Turned Spotlight indexing on',
+  'activity.spotlightImported': {one: 'Added {count} app to Spotlight', other: 'Added {count} apps to Spotlight'},
   'activity.tweak': '{title}: {before} → {after}',
 
   // ---------- Dialogs ----------

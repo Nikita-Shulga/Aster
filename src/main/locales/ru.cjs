@@ -52,6 +52,13 @@ module.exports = {
   'activity.purge': 'Освобождена неактивная память',
   'activity.trashEmptied': 'Корзина очищена',
   'activity.launchServices': 'Перестроена база данных Launch Services',
+  'activity.searchShortcuts': {one: 'В меню «Пуск» добавлена {count} программа для поиска Windows', few: 'В меню «Пуск» добавлены {count} программы для поиска Windows', many: 'В меню «Пуск» добавлено {count} программ для поиска Windows', other: 'В меню «Пуск» добавлено {count} программы для поиска Windows'},
+  'activity.searchShortcutsRemoved': {one: 'Убран {count} ярлык в «Пуске», добавленный Aster', few: 'Убрано {count} ярлыка в «Пуске», добавленных Aster', many: 'Убрано {count} ярлыков в «Пуске», добавленных Aster', other: 'Убрано {count} ярлыка в «Пуске», добавленных Aster'},
+  'activity.searchRestarted': 'Поиск перезапущен',
+  'activity.searchRebuilt': 'Запущена перестройка индекса поиска Windows',
+  'activity.searchServiceOn': 'Служба поиска Windows снова включена',
+  'activity.spotlightOn': 'Включена индексация Spotlight',
+  'activity.spotlightImported': {one: 'В Spotlight добавлено {count} приложение', few: 'В Spotlight добавлено {count} приложения', many: 'В Spotlight добавлено {count} приложений', other: 'В Spotlight добавлено {count} приложения'},
   'activity.tweak': '{title}: {before} → {after}',
 
   // ---------- Диалоговые окна ----------

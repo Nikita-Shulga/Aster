@@ -33,7 +33,7 @@ module.exports = async function selftest(win, outDir) {
     ['updates', '.empty, .list-row'],
     ['startup', 'tbody tr'],
     ['history', '.list-row, .empty'],
-    ['tools', '.tool'],
+    ['tools', '.tool', 'document.querySelector("[data-action=sdCheck]")?.click(), true', '.sd-list'],
     ['settings', '.setting']
   ];
   let n = 2;

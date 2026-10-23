@@ -1,6 +1,7 @@
 import {html, ic, api, app, modal, toast, bytes, isMac, t, th} from '../lib.js';
 import {definePage} from '../page.js';
 import {onLanguageChange} from '../i18n.js';
+import {searchCard, searchHandlers} from '../search-doctor.js';
 
 // The catalog (actions and shortcuts) comes from the platform layer, so Windows and macOS each get their own tools.
 const s = {catalog: null, busy: new Set()};
@@ -14,6 +15,7 @@ export default definePage({
     if (!s.catalog) return html`${head}<div class="skeleton" style="height:240px"></div>`;
     const actions = s.catalog.actions.filter(a => a.id !== 'admin' || !app.system?.admin);
     return html`${head}
+      ${searchCard()}
       <div class="grid grid-2">
         ${actions.map(a => html`<button class="card tool" data-action="run" data-id="${a.id}" ${s.busy.has(a.id) ? 'disabled' : ''}>
           <div class="tile ${a.tone}">${s.busy.has(a.id) ? html`<span class="spinner"></span>` : ic(a.icon, 18)}</div>
@@ -32,6 +34,7 @@ export default definePage({
   },
   onMount() { if (!s.catalog) api('tools.catalog').then(c => { s.catalog = c; this.update(); }); },
   on: {
+    ...searchHandlers,
     async launch(el) { await api('tools.launch', {id: el.dataset.id}); },
     async run(el) {
       const id = el.dataset.id;

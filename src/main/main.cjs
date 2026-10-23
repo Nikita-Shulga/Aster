@@ -22,7 +22,8 @@ const P = isMac ? {
   Tools: require('./mac/tools.cjs').MacTools,
   identify: require('./mac/identify.cjs').identify,
   Tweaks: require('./mac/tweaks.cjs').MacTweaks,
-  Display: require('./mac/display.cjs').MacDisplay
+  Display: require('./mac/display.cjs').MacDisplay,
+  Search: require('./mac/search.cjs').MacSearch
 } : {
   system: require('./system.cjs'),
   Registry: require('./registry.cjs').Registry,
@@ -32,7 +33,8 @@ const P = isMac ? {
   Tools: require('./tools.cjs').Tools,
   identify: require('./identify.cjs').identify,
   Tweaks: require('./tweaks.cjs').Tweaks,
-  Display: require('./display.cjs').Display
+  Display: require('./display.cjs').Display,
+  Search: require('./search.cjs').Search
 };
 const {system, identify} = P;
 const FDA_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles';
@@ -151,6 +153,7 @@ async function main() {
   const tools = new P.Tools({store, shell});
   const tweaks = new P.Tweaks({store, buildNumber: async () => (sysInfo || (sysInfo = await system.info())).build || 0});
   const display = new P.Display({store});
+  const search = new P.Search({store, getIcon, getDrives, trash});
   const updater = new Updater({app, shell, store, onProgress: p => send('appUpdate', p)});
   setTimeout(() => updater.cleanup(), 60000); // after an update, give the installer time to exit first
 
@@ -285,6 +288,10 @@ async function main() {
     'tools.launch': a => tools.launch(a),
     'tools.flushDns': () => tools.flushDns(),
     'tools.restorePoint': a => tools.restorePoint(a),
+    'search.check': () => search.check(),
+    'search.addApps': a => search.addApps({ids: Array.isArray(a?.ids) ? a.ids.filter(x => typeof x === 'string').slice(0, 200) : []}),
+    'search.removeAdded': () => search.removeAdded(),
+    'search.fix': a => search.fix({id: String(a?.id || '')}),
 
     'activity.list': () => store.getActivity(),
     'activity.stats': () => store.stats(),

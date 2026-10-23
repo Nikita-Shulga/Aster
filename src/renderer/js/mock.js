@@ -170,6 +170,25 @@ const api = {
     settings: MAC ? [['storage', L('Storage', 'Хранилище'), 'pie'], ['update', L('Software Update', 'Обновление ПО'), 'refresh'], ['loginitems', L('Login Items', 'Объекты входа'), 'power']] : [['storage', L('Storage Sense', 'Контроль памяти'), 'pie'], ['update', L('Windows Update', 'Центр обновления Windows'), 'refresh']], binRule: MAC ? 'macos.trash' : 'windows.recyclebin'}),
   'tools.run': async () => { await wait(500); return {ok: true, message: L('Done', 'Готово')}; },
   'tools.launch': () => ({ok: true}), 'tools.flushDns': async () => { await wait(500); return {ok: true}; }, 'tools.restorePoint': () => ({ok: true}),
+  'search.check': async () => {
+    await wait(900);
+    const app = (name, exe, company, likely = true, extra = {}) => ({id: exe, name, exe, folder: exe.replace(/\\[^\\]+$/, ''), drive: MAC ? null : exe.slice(0, 2), company, likely, icon: null, ...extra});
+    const apps = MAC
+      ? [app('Blender', '/Applications/Blender.app', null), app('Obsidian', '/Applications/Obsidian.app', null)]
+      : [app('Epic Games Launcher', 'H:\\Program Files (x86)\\Epic Games\\Launcher\\Portal\\Binaries\\Win64\\EpicGamesLauncher.exe', 'Epic Games, Inc.'),
+        app('Ubisoft Connect', 'H:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\UbisoftConnect.exe', 'Ubisoft'),
+        app('TeamViewer', 'H:\\Program Files (x86)\\TeamViewer\\TeamViewer.exe', 'TeamViewer Germany GmbH'),
+        app('VLC media player', 'H:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe', 'VideoLAN'),
+        app('WinRAR', 'H:\\Program Files\\WinRAR\\WinRAR.exe', 'Alexander Roshal'),
+        app('Audacity', 'D:\\Program Files\\Audacity\\audacity.exe', 'Audacity Team'),
+        app('WinRAR', 'G:\\Program Files\\WinRAR\\WinRAR.exe', 'Alexander Roshal', false, {older: true}),
+        app('RTSS', 'H:\\Program Files (x86)\\RivaTuner Statistics Server\\RTSS.exe', null, false)].filter(a => !mockSearch.added.some(x => x.id === a.id));
+    return {platform: MAC ? 'darwin' : 'win32', admin: false, service: {status: 'Running', disabled: false, ok: true}, index: {ok: true, error: null}, startMenu: {ok: true, shortcuts: 127}, ui: true,
+      apps, added: mockSearch.added.map(a => ({lnk: a.id, name: a.name})), checkedAt: new Date().toISOString()};
+  },
+  'search.addApps': async ({ids}) => { await wait(600); mockSearch.added.push(...ids.map(id => ({id, name: id.split('\\').pop().replace(/\.exe$/i, '')}))); return {added: ids.length}; },
+  'search.removeAdded': async () => { const n = mockSearch.added.length; mockSearch.added = []; return {removed: n}; },
+  'search.fix': async () => { await wait(700); return {ok: true}; },
   'activity.list': () => activity, 'activity.stats': () => ({cleaned: 14.2 * GB, fixed: 968, lastClean: activity[0].at}),
   'backups.restore': () => ({ok: true}), 'backups.openFolder': () => ({ok: true}),
   'shell.reveal': () => ({ok: true}), 'shell.openUrl': () => ({ok: true})
@@ -192,6 +211,7 @@ const MOCK_TWEAKS = [
   {...TW('taskbarAlign', 'taskbar', L('Taskbar alignment', 'Выравнивание панели задач'), 'center', null, 'preference'), type: 'choice', options: [{value: 'center', label: L('Center', 'По центру')}, {value: 'left', label: L('Left', 'Слева')}], pro: null, con: null},
   TW('clipboardHistory', 'taskbar', L('Clipboard history (Win+V)', 'Журнал буфера обмена (Win+V)'), false, true, 'recommended')
 ];
+const mockSearch = {added: []};
 const power = {plans: [{guid: '381b4222-f694-41f0-9685-ff5bb260df2e', name: L('Balanced', 'Сбалансированная'), active: true}, {guid: 'a1841308-3541-4fab-bc81-f71556f20b4a', name: L('Power saver', 'Экономия энергии'), active: false}], screenAc: 600, screenDc: 300, sleepAc: 1800, sleepDc: 900, battery: false};
 
 export const mockApi = {

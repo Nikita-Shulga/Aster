@@ -16,7 +16,6 @@ const CATALOG = {
     {id: 'thin', icon: 'drive', tone: 'green', title: 'Free space used by local snapshots', text: 'Removes Time Machine local snapshots, which can hold many gigabytes of “purgeable” space.'},
     {id: 'purge', icon: 'gauge', tone: 'blue', title: 'Free up memory', text: 'Clears inactive memory and disk caches so a sluggish Mac gets room back for apps. Asks for your password.', admin: true},
     {id: 'dns', icon: 'network', tone: 'green', title: 'Flush DNS cache', text: 'Fixes sites that fail to load after network or DNS changes. Asks for your password.', admin: true},
-    {id: 'reindex', icon: 'search', tone: '', title: 'Rebuild Spotlight index', text: 'Fixes Spotlight not finding files. Re-indexing runs in the background for a while.', admin: true},
     {id: 'lsreset', icon: 'apps', tone: '', title: 'Fix duplicate “Open With” entries', text: 'Rebuilds the Launch Services database that lists which apps open which files.'},
     {id: 'bin', icon: 'trash', tone: 'amber', title: 'Empty the Trash', text: 'Permanently deletes everything in the Trash.'}
   ],

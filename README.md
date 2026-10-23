@@ -46,6 +46,7 @@
 | 🚀 **Startup & optimizer** | Startup apps, tasks, services, login items and launch agents — switched the same way the OS does it. Reversible tweaks with their trade-offs, power plans, apps hogging memory. |
 | 🔄 **Updates** | WinGet on Windows; macOS, Homebrew and App Store updates on a Mac — one app or all at once. |
 | 🧭 **Disk analyzer & duplicates** | Treemap of any drive, file types, the largest files — and for each one, *what it is, which program owns it and whether deleting it breaks anything*. Content-based duplicate finder across drives. |
+| 🔎 **Fix search** | Windows Search or Spotlight can't find an app you have? Aster checks the search service and its index, finds programs search can't see (on Windows: apps with no Start menu shortcut, e.g. on a second drive) and adds them back. Restart or rebuild search in one click. |
 | 🔍 **Filters everywhere** | Drive, size, date, type, publisher, verdict, last opened… Every list can be narrowed down, and every option shows how many items it matches. |
 | ↩️ **Undo-friendly** | Your files go to the Recycle Bin / Trash, registry changes are backed up first, and **History** restores any backup in one click. |
 | 🌗 **Feels native** | Light and dark themes, English or Russian interface (**Settings → Language**), native title bar and window controls, Full Disk Access guidance on Mac, works without admin rights. |

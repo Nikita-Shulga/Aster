@@ -167,4 +167,15 @@ test('tools: Mac catalog actions are all implemented', async () => {
   for (const a of t.catalog().actions) assert.ok(src.includes(`case '${a.id}'`), a.id);
 });
 
+test('Fix Spotlight: reports indexing, the index and apps Spotlight has not imported', {timeout: 120000}, async () => {
+  const {MacSearch, listApps} = require('../src/main/mac/search.cjs');
+  const s = new MacSearch({store, getIcon: async () => null});
+  const r = await s.check();
+  assert.strictEqual(r.platform, 'darwin');
+  for (const k of ['service', 'index', 'startMenu']) assert.strictEqual(typeof r[k].ok, 'boolean', k);
+  const all = await listApps();
+  for (const a of r.apps) { assert.ok(all.includes(a.exe), a.exe); assert.match(a.exe, /\.app$/); }
+  await assert.rejects(s.addApps({ids: ['not-from-the-list']}), /out of date/);
+});
+
 test.after(() => fs.rmSync(fixture, {recursive: true, force: true}));
