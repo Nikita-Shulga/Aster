@@ -17,7 +17,7 @@
     "dist:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never"
   },
   "devDependencies": {
-    "electron": "44.8.0",
+    "electron": "45.0.0",
     "electron-builder": "26.15.3"
   },
   "build": {
