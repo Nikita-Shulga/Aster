@@ -47,6 +47,26 @@ function subtract(r, removed) {
   return size;
 }
 
+// Smart items: the files that stay, with the reason, so the split between "can go" and "must stay" can be checked.
+// They have no checkbox and can't be removed from here or by cleaning.
+function keptSection(r, s) {
+  const d = s.data;
+  if (!d.smart || !d.keptTotal) return '';
+  const rows = (d.kept || []).slice(0, s.keptLimit);
+  return html`<div class="fb-kept">
+    <div class="fb-pad"><button class="linkish" data-action="fbKept" data-id="${r.id}">${ic(s.showKept ? 'chevronDown' : 'lock', 13)} ${s.showKept ? t('cleaner.fb.keptHide') : t('cleaner.fb.keptShow', {count: d.keptTotal})}</button></div>
+    ${s.showKept ? html`<div class="faint fb-pad" style="padding-top:0">${t('cleaner.fb.keptTitle')} · ${bytes(d.keptBytes)}</div>
+    ${rows.map(f => html`<div class="fb-row kept">
+      <span class="fb-lock">${ic('lock', 14)}</span>
+      <div class="grow fb-name"><div class="truncate" title="${f.path}">${baseName(f.path)}</div>${f.note ? html`<div class="truncate fb-note" title="${f.note}">${f.note}</div>` : ''}</div>
+      <span class="faint fb-date">${date(f.mtime)}</span>
+      <span class="num fb-size">${bytes(f.size)}</span>
+    </div>`)}
+    ${d.kept.length > rows.length ? html`<div class="fb-pad"><button class="linkish" data-action="fbKeptMore" data-id="${r.id}">${t('cleaner.fb.more', {count: Math.min(PAGE, d.kept.length - rows.length), left: d.kept.length - rows.length})}</button></div>` : ''}
+    ${d.keptTotal > d.kept.length ? html`<div class="faint fb-pad">${t('cleaner.fb.keptTruncated', {shown: d.kept.length, total: d.keptTotal})}</div>` : ''}` : ''}
+  </div>`;
+}
+
 export function filesPanel(r, rule) {
   const s = stateOf(r.id);
   if (!s) return '';
@@ -78,13 +98,15 @@ export function filesPanel(r, rule) {
     </div>
     ${page.length ? page.map(f => html`<label class="fb-row">
       ${checkbox(`data-change="fbPick" data-id="${r.id}" data-path="${f.path}"`, s.sel.has(f.path))}
-      <div class="grow fb-name"><div class="truncate" title="${f.path}">${baseName(f.path)}</div><div class="truncate fb-dir">${dirName(f.path)}</div></div>
+      <div class="grow fb-name"><div class="truncate" title="${f.path}">${baseName(f.path)}</div>${f.note ? html`<div class="truncate fb-note" title="${f.note}">${f.note}</div>` : ''}<div class="truncate fb-dir">${dirName(f.path)}</div></div>
       <span class="faint fb-date">${date(f.mtime)}</span>
       <span class="num fb-size">${bytes(f.size)}</span>
       <button class="icon-btn sm" data-action="revealFile" data-path="${f.path}" title="${t(isMac ? 'cleaner.showInFinder' : 'cleaner.showInExplorer')}" aria-label="${t('cleaner.showFile')}">${ic('external', 13)}</button>
     </label>`) : html`<div class="faint fb-pad">${t('cleaner.fb.none')}</div>`}
     ${list.length > page.length ? html`<div class="fb-pad"><button class="linkish" data-action="fbMore" data-id="${r.id}">${t('cleaner.fb.more', {count: Math.min(PAGE, list.length - page.length), left: list.length - page.length})}</button></div>` : ''}
     ${s.data.truncated ? html`<div class="faint fb-pad">${t('cleaner.fb.truncated', {shown: s.data.files.length, total: s.data.total})}</div>` : ''}
+    ${s.data.state ? html`<div class="fb-pad"><div class="callout amber">${ic('alert', 18)}<div class="grow">${t(`cleaner.smart.state.${s.data.state}`)}</div></div></div>` : ''}
+    ${keptSection(r, s)}
   </div>`;
 }
 
@@ -92,7 +114,7 @@ export const filesHandlers = {
   async toggleFiles(el) {
     const id = el.dataset.id;
     if (fb.has(id)) { fb.delete(id); this.update(); return; }
-    const s = {data: null, q: '', sort: 'size', loc: 'all', sel: new Set(), limit: PAGE, busy: false, loading: true};
+    const s = {data: null, q: '', sort: 'size', loc: 'all', sel: new Set(), limit: PAGE, busy: false, loading: true, showKept: false, keptLimit: PAGE};
     fb.set(id, s); this.update();
     try { s.data = await api('cleaner.listFiles', {id}); }
     catch (e) { fb.delete(id); throw e; }
@@ -102,6 +124,8 @@ export const filesHandlers = {
   fbSort(el) { const s = stateOf(el.dataset.id); s.sort = el.value; s.limit = PAGE; this.update(); },
   fbLoc(el) { const s = stateOf(el.dataset.id); s.loc = el.value; s.limit = PAGE; this.update(); },
   fbMore(el) { stateOf(el.dataset.id).limit += PAGE; this.update(); },
+  fbKept(el) { const s = stateOf(el.dataset.id); s.showKept = !s.showKept; this.update(); },
+  fbKeptMore(el) { stateOf(el.dataset.id).keptLimit += PAGE; this.update(); },
   fbPick(el) { const s = stateOf(el.dataset.id); el.checked ? s.sel.add(el.dataset.path) : s.sel.delete(el.dataset.path); this.update(); },
   // Selects every file that matches the search and location, not only the rows on screen.
   fbAll(el) { const s = stateOf(el.dataset.id); for (const f of shown(s)) el.checked ? s.sel.add(f.path) : s.sel.delete(f.path); this.update(); },

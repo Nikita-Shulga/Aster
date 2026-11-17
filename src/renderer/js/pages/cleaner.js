@@ -84,7 +84,7 @@ function progressCard(title) {
 function results() {
   const a = c.analysis;
   const byId = new Map(c.rules.map(r => [r.id, r]));
-  const all = a.results.filter(r => r.bytes > 0 || r.running.length);
+  const all = a.results.filter(r => r.bytes > 0 || r.running.length || r.kept?.state);
   const ruleOf = r => byId.get(r.id);
   const match = (r, skip) => (skip === 'drive' || cf.drive === 'all' || bytesOn(r) > 0) && (skip === 'verdict' || cf.verdict === 'all' || ruleOf(r).verdict === cf.verdict) && (skip === 'group' || cf.group === 'all' || ruleOf(r).group === cf.group);
   const sorters = {size: (x, y) => bytesOn(y) - bytesOn(x), name: (x, y) => `${ruleOf(x).app} ${ruleOf(x).name}`.localeCompare(`${ruleOf(y).app} ${ruleOf(y).name}`), files: (x, y) => filesOn(y) - filesOn(x)};
@@ -125,13 +125,14 @@ function results() {
         return html`<div class="result-item ${openResults.has(r.id) ? 'open' : ''}">
           <div class="list-row clickable result-row" data-action="toggleResult" data-id="${r.id}">
             ${appTile(rule.appId, rule.app)}
-            <div class="grow"><div class="row" style="gap:8px"><span style="font-weight:500">${rule.app} · ${rule.name}</span>${verdictBadge(rule.verdict)}</div><div class="meta">${t('cleaner.files', {count: r.files})} · ${[...new Set((r.locations || []).map(l => l.drive))].join(', ') || '—'}${r.running.length ? html` · <span style="color:var(--amber-text)">${t('cleaner.appRunning', {app: rule.app})}</span>` : ''}</div></div>
+            <div class="grow"><div class="row" style="gap:8px"><span style="font-weight:500">${rule.app} · ${rule.name}</span>${verdictBadge(rule.verdict)}</div><div class="meta">${t('cleaner.files', {count: r.files})} · ${[...new Set((r.locations || []).map(l => l.drive))].join(', ') || '—'}${r.kept?.files ? html` · <span style="color:var(--green-text, var(--text-2))">${t('cleaner.smart.keptShort', {count: r.kept.files, size: bytes(r.kept.bytes)})}</span>` : ''}${r.running.length ? html` · <span style="color:var(--amber-text)">${t('cleaner.appRunning', {app: rule.app})}</span>` : ''}</div></div>
             ${bar(bytesOn(r) / max * 100, r.running.length ? 'amber' : 'accent')}
             <span class="size">${bytes(bytesOn(r))}</span>
             ${ic('chevronDown', 16, 'faint')}
           </div>
           <div class="detail-panel">
             ${explain(rule)}
+            ${keptNote(r)}
             <div style="margin-top:14px;font-size:12.5px;font-weight:600;color:var(--text-2)">${t('cleaner.whereStored')}</div>
             <table class="loc-table selectable">${(allLocs.has(r.id) ? locs : locs.slice(0, 10)).map(l => html`<tr>
               <td style="width:1%"><span class="drive-b">${l.drive}</span></td>
@@ -148,6 +149,14 @@ function results() {
         </div>`;
       })}</div>` : empty({iconName: 'check', title: t('cleaner.empty.title'), text: t('cleaner.empty.text')})}
     </div>`;
+}
+
+// Smart items: what Aster checked and kept, or why it could not check.
+function keptNote(r) {
+  if (!r.kept) return '';
+  if (r.kept.state) return html`<div class="callout amber" style="margin-top:12px">${ic('alert', 18)}<div class="grow">${t(`cleaner.smart.state.${r.kept.state}`)}</div></div>`;
+  if (!r.kept.files) return '';
+  return html`<div class="callout blue" style="margin-top:12px">${ic('shield', 18)}<div class="grow">${th('cleaner.smart.kept', {count: r.kept.files, size: bytes(r.kept.bytes)})}</div></div>`;
 }
 
 function done() {

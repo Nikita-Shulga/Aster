@@ -58,7 +58,9 @@ async function walk(target, visit, ctx) {
   }
 }
 
-async function removeEmptyDirs(root, signal) {
+// prune: optional test for smart rules — only folders it accepts may be removed, so folders that merely happen to
+// be empty next to the files that stay are left alone.
+async function removeEmptyDirs(root, signal, prune = null) {
   if (!isSafeTarget(root)) return;
   const visit = async dir => {
     let entries;
@@ -68,10 +70,18 @@ async function removeEmptyDirs(root, signal) {
       if (signal?.aborted) return false;
       if (e.isDirectory() && !e.isSymbolicLink()) { if (!(await visit(path.join(dir, e.name)))) empty = false; } else empty = false;
     }
-    if (empty && dir !== root) { try { await fs.rmdir(dir); return true; } catch { return false; } }
-    return empty;
+    if (empty && dir !== root && (!prune || prune(dir))) { try { await fs.rmdir(dir); return true; } catch { return false; } }
+    return empty && (!prune || prune(dir));
   };
   await visit(root);
+}
+
+// Smart rules (see smart.cjs) sort their files into removable and kept. If sorting fails for any reason, nothing is
+// removable: the item reports the problem and stays untouched.
+async function classifyRule(rule, ctx) {
+  if (!rule.classify) return null;
+  try { return await rule.classify({procs: ctx.procs || new Set(), signal: ctx.signal}); }
+  catch { return {state: 'unreadable', processes: [], removable: () => false, note: () => '', keptNote: () => t('smart.state.unreadable')}; }
 }
 
 let sidCache = null;
@@ -97,6 +107,7 @@ class Cleaner {
       id: r.id, group: r.group, app: td(r.app), appId: r.appId, name: td(r.name), description: td(r.description),
       defaultOn: !!r.defaultOn, admin: !!r.admin, privacy: !!r.privacy, caution: !!r.caution, fda: !!r.fda,
       verdict: r.verdict || 'safe', contains: td(r.contains || ''), ifDeleted: td(r.ifDeleted || ''), advice: td(r.advice || ''),
+      smart: !!r.classify, how: td(r.how || ''),
       processes: r.processes || [], installed: r.installed ? !!r.installed() : true
     }))};
   }
@@ -106,7 +117,7 @@ class Cleaner {
     return rule.resolve ? rule.resolve() : [];
   }
 
-  ctx(signal) { return {signal, exclusions: (this.getSettings().exclusions || []).filter(Boolean)}; }
+  ctx(signal, procs = null) { return {signal, procs, exclusions: (this.getSettings().exclusions || []).filter(Boolean)}; }
 
   cancel() { this.abort?.abort(); }
 
@@ -115,14 +126,16 @@ class Cleaner {
     const rules = allRules().filter(r => wanted.has(r.id));
     const procs = await runningProcesses();
     this.abort = new AbortController();
-    const ctx = this.ctx(this.abort.signal);
+    const ctx = this.ctx(this.abort.signal, procs);
     const results = [];
     let i = 0;
     for (const rule of rules) {
       if (ctx.signal.aborted) break;
       onProgress({phase: 'analyze', ruleId: rule.id, label: `${td(rule.app)} · ${td(rule.name)}`, index: i++, total: rules.length});
-      const running = (rule.processes || []).filter(p => procs.has(p.toLowerCase()));
+      const cls = await classifyRule(rule, ctx);
+      const running = [...new Set([...(rule.processes || []), ...(cls?.processes || [])])].filter(p => procs.has(p.toLowerCase()));
       let bytes = 0, files = 0; const sample = [];
+      const kept = {files: 0, bytes: 0};
       const locations = [];
       for (const target of await this.targetsFor(rule)) {
         const where = target.dir || target.file;
@@ -130,6 +143,7 @@ class Cleaner {
         const key = target.label || rule.name;
         const loc = {label: tdLabel(key), key, path: where, drive: volumeOf(where), bytes: 0, files: 0};
         await walk(target, async (file, st) => {
+          if (cls && !cls.removable(file, st)) { kept.files++; kept.bytes += st.size; return; }
           bytes += st.size; files++; loc.bytes += st.size; loc.files++;
           if (sample.length < SAMPLE) sample.push({path: file, size: st.size});
           else if (st.size > sample[sample.length - 1].size) { sample[sample.length - 1] = {path: file, size: st.size}; }
@@ -139,7 +153,7 @@ class Cleaner {
         if (loc.files) locations.push(loc);
       }
       locations.sort((a, b) => b.bytes - a.bytes);
-      results.push({id: rule.id, bytes, files, sample, running, locations});
+      results.push({id: rule.id, bytes, files, sample, running, locations, ...(cls ? {kept: {...kept, state: cls.state || null}} : {})});
     }
     this.abort = null;
     return {results, cancelled: ctx.signal.aborted, totalBytes: results.reduce((n, r) => n + r.bytes, 0), totalFiles: results.reduce((n, r) => n + r.files, 0)};
@@ -152,8 +166,12 @@ class Cleaner {
     const onDrive = t => (!drives || drives.includes(volumeOf(t.dir || t.file))) && (!paths || paths.includes(t.dir || t.file));
     const rules = allRules().filter(r => wanted.has(r.id));
     let procs = await runningProcesses();
+    // Smart rules are sorted now, with the current state of the machine, and again from this list for each file.
+    const classes = new Map();
+    for (const r of rules) if (r.classify) classes.set(r.id, await classifyRule(r, this.ctx(null, procs)));
+    const processesOf = r => [...(r.processes || []), ...(classes.get(r.id)?.processes || [])];
     if (closeApps) {
-      const toClose = [...new Set(rules.flatMap(r => r.processes || []).filter(p => procs.has(p.toLowerCase())))];
+      const toClose = [...new Set(rules.flatMap(processesOf).filter(p => procs.has(p.toLowerCase())))];
       for (const image of toClose) {
         if (isMac) { if (/^[\w .+-]{1,80}$/.test(image)) await run('/usr/bin/osascript', ['-e', `quit app "${image}"`], {timeout: 15000}).catch(() => {}); }
         else await run(sys32('taskkill.exe'), ['/IM', image, '/T'], {timeout: 10000}).catch(() => {});
@@ -161,13 +179,14 @@ class Cleaner {
       if (toClose.length) { await new Promise(r => setTimeout(r, 2500)); procs = await runningProcesses(); }
     }
     this.abort = new AbortController();
-    const ctx = this.ctx(this.abort.signal);
+    const ctx = this.ctx(this.abort.signal, procs);
     const results = [];
     let i = 0;
     for (const rule of rules) {
       if (ctx.signal.aborted) break;
       onProgress({phase: 'clean', ruleId: rule.id, label: `${td(rule.app)} · ${td(rule.name)}`, index: i++, total: rules.length});
-      const running = (rule.processes || []).filter(p => procs.has(p.toLowerCase()));
+      const cls = classes.get(rule.id) || null;
+      const running = processesOf(rule).filter(p => procs.has(p.toLowerCase()));
       if (running.length) { results.push({id: rule.id, freed: 0, deleted: 0, skipped: 0, blocked: t('cleaner.appRunning', {app: td(rule.app)})}); continue; }
       let freed = 0, deleted = 0, skipped = 0;
       if (rule.special === 'recyclebin') {
@@ -181,6 +200,7 @@ class Cleaner {
         const targets = (await this.targetsFor(rule)).filter(onDrive);
         for (const target of targets) {
           await walk(target, async (file, st) => {
+            if (cls && !cls.removable(file, st)) return; // a file that something still needs is never touched
             try { await fs.unlink(file); freed += st.size; deleted++; }
             catch (e) {
               if (e.code === 'EPERM' || e.code === 'EACCES') {
@@ -189,7 +209,7 @@ class Cleaner {
               skipped++;
             }
           }, ctx);
-          if (target.dir && target.recursive) await removeEmptyDirs(target.dir, ctx.signal);
+          if (target.dir && target.recursive) await removeEmptyDirs(target.dir, ctx.signal, cls?.prune || (cls ? () => false : null));
         }
       }
       results.push({id: rule.id, freed, deleted, skipped});
@@ -202,24 +222,35 @@ class Cleaner {
 // Every file of one item (or of one of its locations), largest first, so single files can be picked and removed.
 // Capped at FILE_LIST files; the item's own clean button still removes everything.
 const FILE_LIST = 5000;
+const KEPT_LIST = 1000; // files that stay (smart rules), listed for transparency
 Cleaner.prototype.listFiles = async function ({id, path: only = null}) {
   const rule = allRules().find(r => r.id === id);
   if (!rule) throw new Error(t('cleaner.analyzeAgain'));
   const targets = (await this.targetsFor(rule)).filter(tg => !only || (tg.dir || tg.file) === only);
+  const cls = await classifyRule(rule, this.ctx(null, await runningProcesses()));
   const ctx = this.ctx(null);
   let files = [], total = 0, bytes = 0;
+  // Smart rules: the files that stay are listed too, with the reason, so the split can be checked.
+  let kept = [], keptTotal = 0, keptBytes = 0;
+  const trim = (list, n) => { list.sort((a, b) => b.size - a.size); if (list.length > n) list.length = n; };
   for (const target of targets) {
     const where = target.dir || target.file;
     await walk(target, async (file, st) => {
+      if (cls && !cls.removable(file, st)) {
+        keptTotal++; keptBytes += st.size;
+        kept.push({path: file, size: st.size, mtime: st.mtimeMs, loc: where, note: cls.keptNote(file, st)});
+        if (kept.length > KEPT_LIST * 2) trim(kept, KEPT_LIST);
+        return;
+      }
       total++; bytes += st.size;
-      files.push({path: file, size: st.size, mtime: st.mtimeMs, loc: where});
+      files.push({path: file, size: st.size, mtime: st.mtimeMs, loc: where, ...(cls ? {note: cls.note(file, st)} : {})});
       // Keep memory flat on huge caches: trim back to the largest files now and then.
-      if (files.length > FILE_LIST * 2) { files.sort((a, b) => b.size - a.size); files.length = FILE_LIST; }
+      if (files.length > FILE_LIST * 2) trim(files, FILE_LIST);
     }, ctx);
   }
-  files.sort((a, b) => b.size - a.size);
-  if (files.length > FILE_LIST) files.length = FILE_LIST;
-  return {files, total, bytes, truncated: total > files.length, recycleBin: rule.special === 'recyclebin'};
+  trim(files, FILE_LIST); trim(kept, KEPT_LIST);
+  return {files, total, bytes, truncated: total > files.length, recycleBin: rule.special === 'recyclebin',
+    ...(cls ? {smart: true, state: cls.state || null, kept, keptTotal, keptBytes} : {})};
 };
 
 // Removes individual files the user picked: to the Trash / Recycle Bin, or deleted right away (permanent), like
@@ -229,6 +260,7 @@ Cleaner.prototype.removeFiles = async function ({id, paths, permanent = false}) 
   const rule = allRules().find(r => r.id === id);
   if (!rule) throw new Error(t('cleaner.analyzeAgain'));
   const targets = await this.targetsFor(rule);
+  const cls = await classifyRule(rule, this.ctx(null, await runningProcesses()));
   const exclusions = (this.getSettings().exclusions || []).filter(Boolean);
   const inside = p => targets.some(t => t.file ? under(p, [path.resolve(t.file)]) : under(p, [path.resolve(t.dir)]) && p !== path.resolve(t.dir) && (t.recursive || path.dirname(p) === path.resolve(t.dir)) && (!t.match || t.match.test(path.basename(p))) && !(t.exclude && under(p, t.exclude)));
   const done = [], failed = [];
@@ -242,6 +274,7 @@ Cleaner.prototype.removeFiles = async function ({id, paths, permanent = false}) 
     try {
       const st = await fs.lstat(p);
       if (!st.isFile()) throw new Error(t('cleaner.notAFile'));
+      if (cls && !cls.removable(p, st)) throw new Error(t('cleaner.stillNeeded')); // never a file something still needs
       await remove(p);
       done.push(p); freed += st.size;
     } catch (e) { failed.push({path: p, error: e.message}); }

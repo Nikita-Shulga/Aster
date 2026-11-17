@@ -192,11 +192,12 @@ export function busyModal(title, text = '') {
 const verdict = (id, tone, icon) => ({tone, icon, get label() { return t(`verdict.${id}`); }, get short() { return t(`verdict.${id}.short`); }});
 export const VERDICTS = {safe: verdict('safe', 'green', 'check'), review: verdict('review', 'amber', 'info'), keep: verdict('keep', 'red', 'alert')};
 export const verdictBadge = (v, long = false) => { const d = VERDICTS[v] || VERDICTS.review; return html`<span class="badge ${d.tone}">${ic(d.icon, 12)} ${long ? d.label : d.short}</span>`; };
-export function explain({contains, ifDeleted, advice, verdict}) {
+export function explain({contains, ifDeleted, advice, verdict, how}) {
   const d = VERDICTS[verdict] || VERDICTS.review;
   return html`<div class="explain">
     ${contains ? html`<div class="ex-row"><span class="ex-k">${t('explain.what')}</span><span>${contains}</span></div>` : ''}
     ${ifDeleted ? html`<div class="ex-row"><span class="ex-k">${t('explain.ifDeleted')}</span><span>${ifDeleted}</span></div>` : ''}
+    ${how ? html`<div class="ex-row"><span class="ex-k">${t('explain.how')}</span><span>${how}</span></div>` : ''}
     <div class="ex-row"><span class="ex-k">${t('explain.advice')}</span><span class="ex-verdict tone-text-${d.tone}">${ic(d.icon, 14)} <strong>${d.label}.</strong> ${advice || ''}</span></div>
   </div>`;
 }

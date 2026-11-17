@@ -2,6 +2,15 @@
 // tests check that every version there is here too. os: 'win' / 'mac' marks a change for one platform only.
 export const RELEASES = [
   {
+    version: '2.8.0', date: '2026-11-17',
+    title: {en: 'Smart cleaning', ru: 'Умная очистка'},
+    items: [
+      {en: 'Cleaner now tells files that can go from files that must stay, and keeps everything it can’t check — the files that stay are shown with the reason.', ru: 'Очистка теперь отличает файлы, которые можно удалить, от тех, что должны остаться, и оставляет всё, что не удалось проверить; оставшиеся файлы показаны с причиной.'},
+      {os: 'win', en: 'Unused Windows Installer files: only the .msi and .msp copies no installed program or update uses are offered, often gigabytes.', ru: 'Неиспользуемые файлы установщика Windows: предлагаются только копии .msi и .msp, которые не нужны ни одной программе или обновлению, — часто это гигабайты.'},
+      {os: 'win', en: 'Old app versions: Discord, Slack, GitHub Desktop and other self-updating apps leave the previous version behind; Aster removes only the older ones.', ru: 'Старые версии приложений: Discord, Slack, GitHub Desktop и другие самообновляющиеся программы оставляют прежнюю версию; Aster удаляет только более старые.'}
+    ]
+  },
+  {
     version: '2.7.0', date: '2026-10-23',
     title: {en: 'What’s new', ru: 'Что нового'},
     items: [

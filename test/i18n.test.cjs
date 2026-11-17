@@ -102,7 +102,7 @@ test('cleaner rules (Windows and macOS) are translated: names, explanations and 
   const texts = [];
   for (const file of ['../src/main/cleaner-rules.cjs', '../src/main/mac/cleaner-rules.cjs']) {
     const {allRules, GROUPS} = require(file);
-    for (const r of allRules()) texts.push(r.name, r.description, r.contains, r.ifDeleted, r.advice);
+    for (const r of allRules()) texts.push(r.name, r.description, r.contains, r.ifDeleted, r.advice, r.how);
     for (const g of GROUPS) if (!/^(Windows|macOS)$/.test(g.name)) texts.push(g.name);
     // Location labels are written as string literals next to each path.
     const src = fs.readFileSync(require.resolve(file), 'utf8');

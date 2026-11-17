@@ -106,6 +106,21 @@ module.exports = {
   'cleaner.analyzeAgain': 'Запустите анализ ещё раз и повторите попытку.',
   'cleaner.notPartOfItem': 'Файл не относится к этому пункту.',
   'cleaner.notAFile': 'Это не файл.',
+  'cleaner.stillNeeded': 'Этот файл ещё нужен, поэтому он остаётся.',
+
+  // ---------- Умная очистка: что можно удалить, а что должно остаться ----------
+  'smart.state.busy': 'Сейчас что-то устанавливается или обновляется, поэтому ничего не удаляется. Повторите позже.',
+  'smart.state.unreadable': 'Aster не смог полностью проверить эти файлы, поэтому оставляет их все.',
+  'smart.installer.orphan': 'Ни одна установленная программа или обновление не использует этот файл',
+  'smart.installer.product': 'Нужен для: {name}',
+  'smart.installer.patch': 'Нужен для обновления {name}',
+  'smart.installer.productUnnamed': 'Нужен установленной программе',
+  'smart.installer.patchUnnamed': 'Нужен установленному обновлению',
+  'smart.installer.recent': 'Добавлен за последние 24 часа — возможно, относится к идущей установке',
+  'smart.installer.other': 'Пакет, который Aster не может проверить, поэтому он остаётся',
+  'smart.squirrel.old': 'Старая версия {version} — используется версия {latest}',
+  'smart.squirrel.current': 'Версия {version} — используется',
+  'smart.squirrel.updater': 'Программа обновления и скачанные пакеты обновлений',
   'cleaner.recycleBinOn': 'Корзина на диске {drive}',
 
   // ---------- Настройки и резервные копии ----------

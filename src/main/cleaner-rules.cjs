@@ -9,10 +9,13 @@
 //   contains — what is actually stored there
 //   ifDeleted — what you will notice afterwards
 //   advice   — when cleaning it makes sense
-// Special rules (recycle bin) are handled by the engine.
+//   how      — (smart rules) how Aster tells the files that can go from the ones that must stay
+// Special rules (recycle bin) are handled by the engine. Smart rules have a `classify` function (see smart.cjs):
+// the engine only counts, lists and deletes the files it calls removable.
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const smart = require('./smart.cjs');
 
 const env = k => process.env[k] || '';
 const LOCAL = env('LOCALAPPDATA') || path.join(os.homedir(), 'AppData', 'Local');
@@ -211,6 +214,16 @@ const WINDOWS = [
     {dir: path.join(ROAMING, 'Microsoft', 'Windows', 'Recent', 'AutomaticDestinations'), recursive: true, label: 'Automatic jump lists'},
     {dir: path.join(ROAMING, 'Microsoft', 'Windows', 'Recent', 'CustomDestinations'), recursive: true, label: 'Custom jump lists'}
   ]),
+  // Smart: the folder holds files programs still need next to files nothing uses any more.
+  win('installer', 'Unused Windows Installer files', {
+    admin: true, verdict: 'review', smart: true,
+    classify: ({procs}) => smart.installerCache({dir: path.join(WIN, 'Installer'), procs}),
+    installed: () => exists(path.join(WIN, 'Installer')),
+    contains: 'Copies of the installer (.msi) and update (.msp) packages of programs, which Windows keeps in its Installer folder so a program can be repaired, updated or uninstalled. Many belong to programs you still have and must stay. Others are left over from programs that were removed or updates that were replaced, and nothing will ever use them again.',
+    ifDeleted: 'Nothing you will notice: Windows never reads these files again. Files that an installed program or update still needs are never offered, so repairing and uninstalling keep working. Deleted files cannot be restored, except files you send to the Recycle Bin with “Choose files”.',
+    advice: 'Good to clean once Aster has checked them. It needs administrator rights, and it waits while Windows is installing something and skips files from the last 24 hours.',
+    how: 'Aster reads the list of installed programs and updates from Windows, the same list Windows Installer itself uses, and compares every file with it. A file is offered only if no installed program or update refers to it. If the list cannot be read completely, Aster keeps every file.'
+  }, () => [{dir: path.join(WIN, 'Installer'), match: /\.(msi|msp)$/i, label: 'Windows Installer folder'}]),
   win('prefetch', 'Prefetch data', {
     admin: true, defaultOn: false, caution: true, verdict: 'keep',
     contains: 'Notes Windows keeps about how each program starts, so it can load it faster next time.',
@@ -291,8 +304,20 @@ const APPS = [
   }))
 ];
 
+// Squirrel apps (Discord, Slack, GitHub Desktop, Postman…): an Update.exe next to app-<version> folders.
+const squirrel = () => smart.squirrelApps(LOCAL);
+const SQUIRREL = appRule('squirrel', 'Self-updating apps', [], () => squirrel().filter(a => a.old.length).map(a => ({dir: a.root, recursive: true, label: a.name})), {
+  name: 'Old app versions', verdict: 'review', defaultOn: false, smart: true,
+  classify: ({procs}) => smart.squirrelOldVersions({base: LOCAL, procs}),
+  installed: () => squirrel().some(a => a.old.length),
+  contains: 'Apps like Discord, Slack and GitHub Desktop update themselves by installing the new version next to the old one. The old version is meant to be deleted afterwards, but often stays and takes several hundred megabytes. The newest version, the updater and the downloaded update packages are what the app still uses.',
+  ifDeleted: 'Nothing: the app always starts its newest version. Only older version folders are removed; the newest version is never touched, and an app that is running is skipped.',
+  advice: 'Safe to clean when the apps are closed. Aster keeps the newest version of every app, and does nothing while an update is running.',
+  how: 'Aster finds each app folder that has an updater (Update.exe) and version folders such as app-1.0.9164, compares the version numbers and offers only the folders of versions older than the newest one. If the newest version looks unfinished, nothing is offered.'
+});
+
 function allRules() {
-  return [...WINDOWS, ...CHROMIUM.flatMap(chromiumRules), ...firefoxRules(), ...APPS];
+  return [...WINDOWS, ...CHROMIUM.flatMap(chromiumRules), ...firefoxRules(), ...APPS, SQUIRREL];
 }
 
 const GROUPS = [

@@ -287,5 +287,28 @@ module.exports = {
   'npm package cache': 'Кэш пакетов npm',
   'pip (Python) package cache': 'Кэш пакетов pip (Python)',
   'Yarn package cache': 'Кэш пакетов Yarn',
-  'NuGet (.NET) package cache': 'Кэш пакетов NuGet (.NET)'
+  'NuGet (.NET) package cache': 'Кэш пакетов NuGet (.NET)',
+
+  // Smart items: files that can go vs files that must stay
+  'Unused Windows Installer files': 'Неиспользуемые файлы установщика Windows',
+  'Copies of the installer (.msi) and update (.msp) packages of programs, which Windows keeps in its Installer folder so a program can be repaired, updated or uninstalled. Many belong to programs you still have and must stay. Others are left over from programs that were removed or updates that were replaced, and nothing will ever use them again.':
+    'Копии установочных (.msi) и обновляющих (.msp) пакетов программ, которые Windows хранит в папке Installer, чтобы программу можно было восстановить, обновить или удалить. Многие из них относятся к программам, которые у вас ещё стоят, и должны остаться. Остальные — остатки удалённых программ и заменённых обновлений, они больше никому не понадобятся.',
+  'Nothing you will notice: Windows never reads these files again. Files that an installed program or update still needs are never offered, so repairing and uninstalling keep working. Deleted files cannot be restored, except files you send to the Recycle Bin with “Choose files”.':
+    'Вы ничего не заметите: Windows больше не обращается к этим файлам. Файлы, которые ещё нужны установленной программе или обновлению, не предлагаются к удалению, поэтому восстановление и удаление программ продолжают работать. Удалённые файлы нельзя вернуть — кроме тех, что вы отправили в Корзину через «Выбрать файлы».',
+  'Good to clean once Aster has checked them. It needs administrator rights, and it waits while Windows is installing something and skips files from the last 24 hours.':
+    'Можно очищать, когда Aster их проверил. Нужны права администратора. Пока Windows что-то устанавливает, очистка не выполняется, а файлы последних 24 часов пропускаются.',
+  'Aster reads the list of installed programs and updates from Windows, the same list Windows Installer itself uses, and compares every file with it. A file is offered only if no installed program or update refers to it. If the list cannot be read completely, Aster keeps every file.':
+    'Aster читает у Windows список установленных программ и обновлений — тот же, которым пользуется сам установщик Windows, — и сверяет с ним каждый файл. Файл предлагается к удалению, только если на него не ссылается ни одна установленная программа или обновление. Если список не удалось прочитать полностью, Aster оставляет все файлы.',
+  'Windows Installer folder': 'Папка установщика Windows',
+
+  'Self-updating apps': 'Самообновляющиеся приложения',
+  'Old app versions': 'Старые версии приложений',
+  'Apps like Discord, Slack and GitHub Desktop update themselves by installing the new version next to the old one. The old version is meant to be deleted afterwards, but often stays and takes several hundred megabytes. The newest version, the updater and the downloaded update packages are what the app still uses.':
+    'Приложения вроде Discord, Slack и GitHub Desktop обновляются сами: новая версия ставится рядом со старой. Старую версию после этого должны удалять, но она часто остаётся и занимает несколько сотен мегабайт. Приложение использует только новую версию, программу обновления и скачанные пакеты обновлений.',
+  'Nothing: the app always starts its newest version. Only older version folders are removed; the newest version is never touched, and an app that is running is skipped.':
+    'Ничего: приложение всегда запускает самую новую версию. Удаляются только папки более старых версий; новая версия не затрагивается, а запущенные приложения пропускаются.',
+  'Safe to clean when the apps are closed. Aster keeps the newest version of every app, and does nothing while an update is running.':
+    'Можно очищать, когда приложения закрыты. Aster оставляет самую новую версию каждого приложения и ничего не делает, пока идёт обновление.',
+  'Aster finds each app folder that has an updater (Update.exe) and version folders such as app-1.0.9164, compares the version numbers and offers only the folders of versions older than the newest one. If the newest version looks unfinished, nothing is offered.':
+    'Aster находит папки приложений с программой обновления (Update.exe) и папками версий вида app-1.0.9164, сравнивает номера версий и предлагает только папки версий старше самой новой. Если самая новая версия выглядит незавершённой, ничего не предлагается.'
 };

@@ -107,6 +107,21 @@ module.exports = {
   'cleaner.analyzeAgain': 'Analyze again and retry.',
   'cleaner.notPartOfItem': 'Not part of this item.',
   'cleaner.notAFile': 'Not a file.',
+  'cleaner.stillNeeded': 'Something still needs this file, so it stays.',
+
+  // ---------- Smart cleaning: telling files that can go from files that must stay ----------
+  'smart.state.busy': 'Something is installing or updating right now, so nothing is removed. Try again later.',
+  'smart.state.unreadable': 'Aster could not check these files completely, so it keeps all of them.',
+  'smart.installer.orphan': 'No installed program or update uses this file',
+  'smart.installer.product': 'Needed by {name}',
+  'smart.installer.patch': 'Needed by the update {name}',
+  'smart.installer.productUnnamed': 'Needed by an installed program',
+  'smart.installer.patchUnnamed': 'Needed by an installed update',
+  'smart.installer.recent': 'Added in the last 24 hours — may belong to an installation in progress',
+  'smart.installer.other': 'Not a package Aster can check, so it stays',
+  'smart.squirrel.old': 'Old version {version} — version {latest} is the one in use',
+  'smart.squirrel.current': 'Version {version} — in use',
+  'smart.squirrel.updater': 'Updater and downloaded update packages',
   'cleaner.recycleBinOn': 'Recycle Bin on drive {drive}',
 
   // ---------- Settings and backups ----------
