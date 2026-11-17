@@ -110,6 +110,7 @@ module.exports = {
   'cleaner.stillNeeded': 'Something still needs this file, so it stays.',
 
   // ---------- Smart cleaning: telling files that can go from files that must stay ----------
+  'smart.guard.installer': 'Windows Installer files are only moved when Aster has checked that no installed program or update needs them. This one stays.',
   'smart.state.busy': 'Something is installing or updating right now, so nothing is removed. Try again later.',
   'smart.state.unreadable': 'Aster could not check these files completely, so it keeps all of them.',
   'smart.installer.orphan': 'No installed program or update uses this file',

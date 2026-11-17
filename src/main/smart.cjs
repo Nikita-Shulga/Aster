@@ -89,7 +89,8 @@ const INSTALLER_BUSY = ['msiexec.exe', 'tiworker.exe'];
 async function installerCache({dir, procs: running = new Set(), readRefs = hooks.readRefs, now = hooks.now()}) {
   const procs = hooks.procs || running;
   const here = norm(dir);
-  const none = state => ({state, processes: [], removable: () => false, note: () => '', keptNote: () => t(`smart.state.${state}`)});
+  // status(file, stat): 'orphan' | 'needed' | 'recent' | 'other' | 'unknown' (could not check); ref(file): the program or update that needs it.
+  const none = state => ({state, processes: [], removable: () => false, note: () => '', keptNote: () => t(`smart.state.${state}`), status: () => 'unknown', ref: () => null});
   if ([...procs].some(p => INSTALLER_BUSY.includes(p))) return none('busy');
   let data;
   try { data = await readRefs(); } catch { return none('unreadable'); }
@@ -111,6 +112,8 @@ async function installerCache({dir, procs: running = new Set(), readRefs = hooks
     state: null,
     processes: [],
     removable,
+    status: (file, st) => !inFolder(file) ? 'other' : refs.has(norm(file)) ? 'needed' : recent(st) ? 'recent' : 'orphan',
+    ref: file => refs.get(norm(file)) || null,
     note: () => t('smart.installer.orphan'),
     keptNote(file, st) {
       const ref = refs.get(norm(file));
@@ -172,8 +175,20 @@ async function squirrelOldVersions({base, procs: running = new Set()}) {
   const oldDirs = apps.flatMap(a => a.old.map(o => ({dir: norm(o.dir), version: o.version, latest: a.newest.version, root: norm(a.root)})));
   const updating = procs.has('update.exe');
   const find = file => { const f = norm(file); return oldDirs.find(o => f.startsWith(o.dir + path.sep)); };
+  // Where a path lies in an app folder, for explaining it: an old version (itself or inside), the current version, or the updater data.
+  const inside = (f, dir) => f === dir || f.startsWith(dir + path.sep);
+  const info = file => {
+    const f = norm(file);
+    const old = oldDirs.find(o => inside(f, o.dir));
+    if (old) return {kind: 'old', app: apps.find(a => norm(a.root) === old.root)?.name || '', version: old.version, latest: old.latest};
+    const app = apps.find(a => inside(f, norm(a.root)));
+    if (!app) return null;
+    if (inside(f, norm(app.newest.dir))) return {kind: 'current', app: app.name, version: app.newest.version, latest: app.newest.version};
+    return f === norm(app.root) ? {kind: 'root', app: app.name, version: app.newest.version, latest: app.newest.version, old: app.old.length} : {kind: 'updater', app: app.name, version: '', latest: app.newest.version};
+  };
   return {
     state: updating ? 'busy' : null,
+    info,
     processes: [...new Set(apps.flatMap(a => a.exes))],
     removable: file => !updating && !!find(file),
     note(file) { const o = find(file); return o ? t('smart.squirrel.old', {version: o.version, latest: o.latest}) : ''; },
@@ -187,4 +202,19 @@ async function squirrelOldVersions({base, procs: running = new Set()}) {
   };
 }
 
-module.exports = {hooks, installerCache, squirrelOldVersions, squirrelApps, compareVersions, readInstallerRefs, INSTALLER_BUSY};
+// Disk analyzer: may this path be moved to the Recycle Bin? Inside the Installer folder only a package that nothing
+// refers to may go (and not while Windows is installing, or if the check fails). Returns a message when it must stay.
+// memo: one object per batch, so the registry is read once for all files.
+async function installerGuard(p, {dir, procs = new Set(), memo = {}}) {
+  const f = norm(p), here = norm(dir);
+  if (f !== here && !f.startsWith(here + path.sep)) return null; // not in the Installer folder: not this guard's business
+  let st;
+  try { st = fs.lstatSync(p); } catch { return null; }
+  if (st.isFile() && norm(path.dirname(p)) === here && /\.(msi|msp)$/i.test(p)) {
+    const cls = await (memo.cls ||= installerCache({dir, procs}));
+    if (cls.removable(p, st)) return null;
+  }
+  return t('smart.guard.installer');
+}
+
+module.exports = {hooks, installerGuard, installerCache, squirrelOldVersions, squirrelApps, compareVersions, readInstallerRefs, INSTALLER_BUSY};

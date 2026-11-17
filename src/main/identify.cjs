@@ -4,7 +4,9 @@
 // → executable metadata (company/product) → file type.
 const path = require('node:path');
 const {psJson, arr} = require('./ps.cjs');
-const {td} = require('./i18n.cjs');
+const fs = require('node:fs');
+const {td, locale, getLanguage} = require('./i18n.cjs');
+const smart = require('./smart.cjs');
 
 const env = k => (process.env[k] || '').toLowerCase().replace(/\\+$/, '');
 const SYS = env('SystemDrive') || 'c:';
@@ -50,7 +52,7 @@ function folderOwnerName(rel) {
 }
 
 // Owners that are descriptions rather than names; program, folder and brand names are left as they are.
-const OWNERS = new Set(['Installers', 'Game launcher', 'Temporary files', 'Your downloads', 'You']);
+const OWNERS = new Set(['Installers', 'Game launcher', 'Temporary files', 'Your downloads', 'You', 'Windows Installer']);
 
 // The explanation in the interface language: the tables stay in English and td() translates them on the way out.
 function translate(info) {
@@ -145,12 +147,102 @@ $out = foreach ($p in @($in.paths)) {
 Out-Json @($out)
 `;
 
+// ---------------------------------------------------------------------------------------------------------
+// Smart places: folders where some files are still needed and others are not (see smart.cjs). The general rules above
+// can only say "the whole folder is the installer cache, keep it"; here each file is checked against what is installed.
+// The classifiers are cached for a minute, so opening folders one after another reads the registry once.
+// ---------------------------------------------------------------------------------------------------------
+const INSTALLER = path.join(process.env.SystemRoot || 'C:\\Windows', 'Installer');
+const SMART_TTL = 60e3;
+const smartCache = new Map();
+const smartOnce = (key, make) => {
+  const hit = smartCache.get(key);
+  if (hit && Date.now() - hit.at < SMART_TTL) return hit.value;
+  const value = make();
+  smartCache.set(key, {at: Date.now(), value});
+  return value;
+};
+const resetSmartCache = () => smartCache.clear();
+const within = (l, dir) => { const d = dir.toLowerCase().replace(/\\+$/, ''); return l === d || l.startsWith(d + '\\'); };
+
+function sizeText(n) {
+  const units = getLanguage() === 'ru' ? ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'] : ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toLocaleString(locale(), {maximumFractionDigits: i ? 1 : 0})} ${units[i]}`;
+}
+
+const INSTALLER_OWNER = 'Windows Installer';
+
+function explainInstaller(p, isDir, l, cls) {
+  const here = INSTALLER.toLowerCase();
+  const name = path.basename(l);
+  const unchecked = cls.state === 'unreadable';
+  if (l === here) {
+    let orphans = 0, orphanBytes = 0, needed = 0, neededBytes = 0;
+    if (!unchecked) {
+      try {
+        for (const e of fs.readdirSync(INSTALLER, {withFileTypes: true})) {
+          if (!e.isFile() || !/\.(msi|msp)$/i.test(e.name)) continue;
+          const file = path.join(INSTALLER, e.name);
+          const st = fs.lstatSync(file);
+          if (cls.removable(file, st)) { orphans++; orphanBytes += st.size; } else { needed++; neededBytes += st.size; }
+        }
+      } catch {}
+    }
+    if (unchecked || !(orphans + needed)) return R('keep', 'Windows Installer cache', 'Copies of installers Windows needs to update, repair or uninstall your programs. Aster could not check which of them are still needed.', 'Do not delete the folder or its files. Run Aster as administrator and analyze again to check them.', INSTALLER_OWNER);
+    return R(orphans ? 'review' : 'keep', 'Windows Installer cache',
+      td('Copies of installers Windows needs to update, repair or uninstall your programs. Aster checked each package: {needed} files ({neededSize}) are still needed by installed programs, and {orphans} files ({orphanSize}) are no longer used by any program or update.', {needed, neededSize: sizeText(neededBytes), orphans, orphanSize: sizeText(orphanBytes)}),
+      orphans ? 'Never delete the folder itself. Open it and select the files marked Safe — only those can go. The Cleaner’s “Unused Windows Installer files” does the same in one step.' : 'Do not delete — every package here is still needed by an installed program or update.', INSTALLER_OWNER);
+  }
+  if (path.dirname(l) === here && /\.(msi|msp)$/i.test(name)) {
+    if (unchecked) return R('keep', 'Windows Installer package', 'An installer or update package kept by Windows. Aster could not check whether an installed program still needs it.', 'Leave it. Run Aster as administrator and analyze again to check it.', INSTALLER_OWNER);
+    let st = null;
+    try { st = fs.lstatSync(p); } catch {}
+    const status = cls.status(p, st);
+    const ref = cls.ref(p);
+    if (status === 'needed') {
+      const patch = ref?.kind === 'patch';
+      const what = ref?.name
+        ? td(patch ? 'Needed by the update {name}. Windows keeps this copy so the update can be repaired or removed.' : 'Needed by {name}. Windows keeps this copy so the program can be repaired, updated or uninstalled.', {name: ref.name})
+        : (patch ? 'Needed by an installed update. Windows keeps this copy so the update can be repaired or removed.' : 'Needed by an installed program. Windows keeps this copy so the program can be repaired, updated or uninstalled.');
+      return R('keep', patch ? 'Update package in use' : 'Installer package in use', what, 'Do not delete — the program or update could no longer be repaired, updated or removed.', ref?.name || INSTALLER_OWNER);
+    }
+    if (status === 'recent') return R('review', 'New Windows Installer package', 'Added to the Installer folder in the last 24 hours, so it may belong to an installation or update that is still running.', 'Leave it for now. If it is still unused tomorrow, Aster marks it as safe to delete.', INSTALLER_OWNER);
+    if (status === 'orphan') return R('safe', 'Unused Windows Installer package', 'No installed program or update refers to this file any more. It was left behind by a program that was removed or by an update that was replaced, and Windows will never read it again.', 'Safe to delete. Moving it to the Recycle Bin keeps it restorable. Only unused packages can be moved from this folder.', INSTALLER_OWNER);
+  }
+  if (isDir && name === '$patchcache$') return R('keep', 'Update uninstall cache', 'The original files of programs, kept so Windows can remove or repair their updates.', 'Do not delete — updates could no longer be uninstalled.', INSTALLER_OWNER);
+  if (isDir && path.dirname(l) === here && /^\{[0-9a-f-]{36}\}$/.test(name)) return R('keep', 'Program icons', 'Icons that installed programs use for their shortcuts and in the list of installed programs.', 'Do not delete — shortcuts and Programs would show blank icons.', INSTALLER_OWNER);
+  return null;
+}
+
+function explainSquirrel(l, cls) {
+  const info = cls.info(l);
+  if (!info) return null;
+  const app = titleCase(info.app);
+  if (info.kind === 'old') return R('safe', 'Old app version', td('Version {version} of {app}, replaced by version {latest}. The app starts the newer version, so this older copy is not used any more.', {version: info.version, app, latest: info.latest}), td('Safe to delete while {app} is closed. The Cleaner’s “Old app versions” removes them in one step.', {app}), app);
+  if (info.kind === 'current') return R('keep', 'Current app version', td('Version {version} of {app} — the one the app runs.', {version: info.version, app}), td('Do not delete — uninstall {app} from Programs instead.', {app}), app);
+  if (info.kind === 'root') return R(info.old ? 'review' : 'keep', 'Self-updating app', info.old ? td('{app} updates itself by installing each new version next to the old one. Older versions are still here ({count}) and can go; the newest version, the updater and the downloaded packages stay.', {app, count: info.old}) : td('{app} updates itself. Only its current version is here.', {app}), info.old ? 'Open the folder and select the old app-… version folders marked Safe. Never delete the newest version or Update.exe.' : td('Do not delete — uninstall {app} from Programs instead.', {app}), app);
+  return R('keep', 'App updater', td('The updater and downloaded update packages of {app}.', {app}), td('Do not delete — {app} needs them to update itself.', {app}), app);
+}
+
+// Explanation for one item in a smart place, or null when the general rules apply.
+async function smartExplain(it) {
+  const p = it.path;
+  const l = p.toLowerCase().replace(/\\+$/, '');
+  if (within(l, INSTALLER)) return explainInstaller(p, !!it.dir, l, await smartOnce('installer', () => smart.installerCache({dir: INSTALLER})));
+  if (LOCAL && l.startsWith(LOCAL + '\\')) return explainSquirrel(l, await smartOnce('squirrel', () => smart.squirrelOldVersions({base: LOCAL})));
+  return null;
+}
+
 async function identify({items, programs}) {
   const exes = items.filter(i => !i.dir && /\.(exe|dll|sys)$/i.test(i.path)).map(i => i.path).slice(0, 60);
   const meta = new Map();
   if (exes.length) for (const m of arr(await psJson(VERSION_INFO, {paths: exes}, {timeout: 20000}).catch(() => []))) meta.set(m.path.toLowerCase(), m);
   const out = {};
   for (const it of items) {
+    const special = await smartExplain(it);
+    if (special) { out[it.path] = {...translate(special), smart: true}; continue; }
     const info = classify(it.path, !!it.dir, programs);
     const m = meta.get(it.path.toLowerCase());
     if (m && (m.product || m.company)) {
@@ -162,4 +254,4 @@ async function identify({items, programs}) {
   return out;
 }
 
-module.exports = {identify, classify, EXT};
+module.exports = {identify, classify, EXT, resetSmartCache};

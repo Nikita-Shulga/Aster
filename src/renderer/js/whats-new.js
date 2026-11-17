@@ -2,6 +2,16 @@
 // tests check that every version there is here too. os: 'win' / 'mac' marks a change for one platform only.
 export const RELEASES = [
   {
+    version: '2.9.0', date: '2026-11-17',
+    title: {en: 'Smart cleaning in the Disk analyzer', ru: 'Умная очистка в анализаторе диска'},
+    items: [
+      {os: 'win', en: 'Disk analyzer checks every file in the Windows Installer folder: unused packages are marked Safe, the ones programs need are marked Keep with the program’s name.', ru: 'Анализатор диска проверяет каждый файл в папке установщика Windows: неиспользуемые пакеты помечены «Можно удалить», нужные программам — «Лучше оставить» с названием программы.'},
+      {os: 'win', en: 'Old versions of self-updating apps (Discord, Slack…) are marked Safe; the current version and the updater are kept.', ru: 'Старые версии самообновляющихся приложений (Discord, Slack…) помечены «Можно удалить»; текущая версия и программа обновления остаются.'},
+      {en: 'Safe-to-delete blocks are green in the treemap, and one button selects all items marked Safe in a folder.', ru: 'Блоки «Можно удалить» выделены зелёным на карте, а одна кнопка выбирает все такие объекты в папке.'},
+      {os: 'win', en: 'Installer files that something still needs can’t be moved to the Recycle Bin from the Disk analyzer.', ru: 'Файлы установщика, которые ещё нужны, нельзя переместить в Корзину из анализатора диска.'}
+    ]
+  },
+  {
     version: '2.8.0', date: '2026-11-17',
     title: {en: 'Smart cleaning', ru: 'Умная очистка'},
     items: [

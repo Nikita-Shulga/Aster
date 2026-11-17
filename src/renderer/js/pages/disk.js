@@ -88,7 +88,9 @@ function treemap() {
   const rects = squarify(items.map(i => i.size), 0, 0, W, H);
   el.innerHTML = rects.map((r, k) => {
     const it = items[k];
-    const color = it.dir ? PALETTE[k % PALETTE.length] : '#94a3b8';
+    // Blocks Aster has identified as safe to delete stand out in green, so they can be spotted at a glance.
+    const safe = ids.get(it.path)?.verdict === 'safe';
+    const color = safe ? '#16a34a' : it.dir ? PALETTE[k % PALETTE.length] : '#94a3b8';
     const label = r.w > 70 && r.h > 34;
     return `<div class="tm-cell" data-action="${it.dir ? 'enter' : 'revealFile'}" data-path="${it.path.replace(/"/g, '&quot;')}" title="${it.name.replace(/"/g, '&quot;')} — ${bytes(it.size)}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${color}">${label ? `<div class="n">${it.name.replace(/[<>&]/g, '')}</div><div class="s">${bytes(it.size)}</div>` : ''}</div>`;
   }).join('');
@@ -125,6 +127,14 @@ function filterBar() {
     ${chip('verdict', t('disk.deleteQ'), VERD.map(o => ({value: o.value, label: t(o.key), count: cnt('verdict', i => ids.get(i.path)?.verdict === o.value)})), df.verdict)}
   </div>
   ${filtersActive() ? html`<div class="filter-result"><span>${th('disk.showing', {shown: visibleItems().length, total: items.length, count: items.length})}</span><button class="linkish" data-action="clearFilters">${t('filters.clear')}</button></div>` : ''}`;
+}
+
+// Items Aster has identified as safe to delete in this folder, one click to select them (they still need confirming).
+function safeBar() {
+  const safe = visibleItems().filter(i => ids.get(i.path)?.verdict === 'safe');
+  const left = safe.filter(i => !s.selected.has(i.path));
+  if (!left.length) return '';
+  return html`<div class="callout green" style="margin:12px 16px 0">${ic('shield', 18)}<div class="grow"><strong>${t('disk.selectSafe', {count: left.length, size: bytes(left.reduce((n, i) => n + i.size, 0))})}</strong><div style="margin-top:2px">${t('disk.selectSafeNote')}</div></div><button class="btn btn-sm btn-secondary" data-action="selectSafe">${t('disk.selectSafeButton')}</button></div>`;
 }
 
 function filesTable() {
@@ -186,6 +196,7 @@ export default definePage({
             ${s.path !== s.result.root ? html`<span class="spacer"></span><button class="btn btn-ghost btn-sm" data-action="upLevel">${ic('arrowUp', 15)} ${t('disk.upOneLevel')}</button>` : ''}
           </div>
           ${filterBar()}
+          ${safeBar()}
           <div class="treemap" id="treemap"></div>
           <div class="table-wrap">${filesTable()}</div>
         </div>
@@ -223,11 +234,12 @@ export default definePage({
       const info = ids.get(p) || {verdict: 'review', what: t('disk.stillIdentifying'), advice: ''};
       const item = s.view?.items.find(i => i.path === p) || s.result?.top.find(f => f.path === p);
       const {ok} = await modal({title: baseName(p) || p, icon: VERDICTS[info.verdict]?.icon, wide: true, confirm: reveal(), cancel: t('common.close'), body: html`
-        <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">${info.kind ? html`<span class="badge">${info.kind}</span>` : ''}${info.owner ? html`<span class="badge accent">${t('disk.belongsTo', {owner: info.owner})}</span>` : ''}${item ? html`<span class="badge num">${bytes(item.size)}</span>` : ''}</div>
+        <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">${info.kind ? html`<span class="badge">${info.kind}</span>` : ''}${info.owner ? html`<span class="badge accent">${t('disk.belongsTo', {owner: info.owner})}</span>` : ''}${info.smart ? html`<span class="badge green">${ic('shield', 12)} ${t('disk.checked')}</span>` : ''}${item ? html`<span class="badge num">${bytes(item.size)}</span>` : ''}</div>
         <div class="mono selectable faint" style="font-size:11.5px;word-break:break-all;margin-bottom:12px">${p}</div>
         ${explain({contains: info.what, advice: info.advice, verdict: info.verdict})}`});
       if (ok) api('shell.reveal', {path: p});
     },
+    selectSafe() { for (const i of visibleItems()) if (ids.get(i.path)?.verdict === 'safe') s.selected.add(i.path); this.update(); },
     pickRow(el) { el.checked ? s.selected.add(el.dataset.path) : s.selected.delete(el.dataset.path); this.update(); },
     clearSel() { s.selected.clear(); this.update(); },
     async trashOne(el) { await trash(this, [el.dataset.path]); },
@@ -259,7 +271,7 @@ let idGen = 0;
 onLanguageChange(() => { ids.clear(); idGen++; });
 async function identifyVisible(pg) {
   if (identifying || !s.result) return;
-  const want = [...(s.view?.items.slice(0, 80) || []), ...s.result.top.slice(0, 12).map(f => ({path: f.path, dir: false}))].filter(i => !ids.has(i.path));
+  const want = [...(s.view?.items.slice(0, 300) || []), ...s.result.top.slice(0, 12).map(f => ({path: f.path, dir: false}))].filter(i => !ids.has(i.path));
   if (!want.length) return;
   identifying = true;
   const gen = idGen;

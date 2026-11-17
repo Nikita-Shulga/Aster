@@ -119,8 +119,11 @@ class Disk {
   async trashPaths({paths}) {
     const done = [], failed = [];
     let bytes = 0;
+    const guard = await installerGuard();
     for (const p of paths) {
       try {
+        const stay = guard && await guard(p);
+        if (stay) throw new Error(stay);
         const st = await fsp.lstat(p);
         const size = st.isDirectory() ? (this.node(p)?.s || 0) : st.size;
         await this.trash(p);
@@ -154,6 +157,17 @@ class Disk {
       child.s -= size; node = child;
     }
   }
+}
+
+// Windows only: what is in the Installer folder may be moved only if nothing needs it (see smart.cjs).
+const INSTALLER_DIR = path.join(process.env.SystemRoot || 'C:\\Windows', 'Installer');
+async function installerGuard() {
+  if (process.platform !== 'win32') return null;
+  const smart = require('./smart.cjs');
+  const dir = INSTALLER_DIR;
+  const procs = await require('./cleaner.cjs').runningProcesses();
+  const memo = {};
+  return p => smart.installerGuard(p, {dir, procs, memo});
 }
 
 function checkRoot(root) {

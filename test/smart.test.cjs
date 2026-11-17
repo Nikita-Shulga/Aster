@@ -17,6 +17,9 @@ process.env.LOCALAPPDATA = fakeLocal;
 process.env.TEMP = path.join(fakeLocal, 'Temp');
 const smart = require('../src/main/smart.cjs');
 const {Cleaner} = require('../src/main/cleaner.cjs');
+const identifyMod = require('../src/main/identify.cjs');
+const {Disk} = require('../src/main/disk.cjs');
+const i18n = require('../src/main/i18n.cjs');
 // The rules have read their folders; programs started from here (PowerShell, tasklist) need the real values back.
 Object.assign(process.env, realEnv);
 smart.hooks.procs = new Set(); // no installer or updater is "running" unless a test says so
@@ -28,7 +31,7 @@ const cleaner = () => new Cleaner({getSettings: () => ({exclusions: []}), getDri
 // "Now" is two days from now, so files made by the test are older than the 24-hour protection.
 const later = () => Date.now() + 2 * DAY;
 function fakeRegistry(refs, extra = {}) { smart.hooks.readRefs = async () => ({ok: true, problems: 0, refs, ...extra}); smart.hooks.now = later; }
-test.afterEach(() => { smart.hooks.readRefs = smart.readInstallerRefs; smart.hooks.now = () => Date.now(); smart.hooks.procs = new Set(); fs.rmSync(installer, {recursive: true, force: true}); fs.rmSync(fakeLocal, {recursive: true, force: true}); });
+test.afterEach(() => { smart.hooks.readRefs = smart.readInstallerRefs; smart.hooks.now = () => Date.now(); smart.hooks.procs = new Set(); fs.rmSync(installer, {recursive: true, force: true}); fs.rmSync(fakeLocal, {recursive: true, force: true}); identifyMod.resetSmartCache(); i18n.setLanguage('en'); });
 
 function installerFixture() {
   const used = put(path.join(installer, '1a2b3c.msi'), 4000);
@@ -233,6 +236,105 @@ test('smart items explain how they decide', () => {
   assert.deepStrictEqual(smartRules.map(r => r.id).sort(), ['apps.squirrel', 'windows.installer']);
   for (const r of smartRules) { assert.ok(r.how, `${r.id} needs a "how"`); assert.notStrictEqual(r.verdict, 'safe', `${r.id} asks before cleaning`); }
   assert.ok(rules.find(r => r.id === 'windows.installer').admin);
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Disk analyzer: the same distinction, shown file by file
+
+const identify = async (...paths) => {
+  const items = paths.map(p => ({path: p, dir: fs.existsSync(p) && fs.statSync(p).isDirectory()}));
+  return identifyMod.identify({items, programs: []});
+};
+
+test('Disk analyzer: unused Installer packages are Safe, the ones programs need are Keep and name the program', async () => {
+  const f = installerFixture();
+  fakeRegistry(f.refs);
+  const r = await identify(f.used, f.patch, f.orphan, f.orphanPatch, f.icon, path.dirname(f.icon));
+  assert.strictEqual(r[f.orphan].verdict, 'safe');
+  assert.strictEqual(r[f.orphanPatch].verdict, 'safe');
+  assert.ok(r[f.orphan].smart);
+  assert.strictEqual(r[f.used].verdict, 'keep');
+  assert.match(r[f.used].what, /Contoso Suite/);
+  assert.strictEqual(r[f.used].owner, 'Contoso Suite');
+  assert.strictEqual(r[f.patch].verdict, 'keep');
+  assert.match(r[f.patch].what, /Update for Contoso Suite/);
+  assert.strictEqual(r[path.dirname(f.icon)].verdict, 'keep');
+  assert.ok(['keep', 'review'].includes(r[f.icon].verdict), 'files inside icon folders fall back to the general rules');
+});
+
+test('Disk analyzer: the Installer folder says how much of it is unused, and a new file is not called safe', async () => {
+  const f = installerFixture();
+  fakeRegistry(f.refs);
+  const r = (await identify(installer))[installer];
+  assert.strictEqual(r.verdict, 'review');
+  assert.match(r.what, /2 files/);   // needed
+  assert.match(r.what, /2 files \(\d+(\.\d)? (B|KB)\)/);   // sizes come with units
+  smart.hooks.now = () => Date.now(); // the fixture was created just now
+  identifyMod.resetSmartCache();
+  const fresh = await identify(f.orphan);
+  assert.strictEqual(fresh[f.orphan].verdict, 'review');
+  assert.match(fresh[f.orphan].what, /24 hours/);
+});
+
+test('Disk analyzer: when the check fails every Installer file is Keep', async () => {
+  const f = installerFixture();
+  smart.hooks.readRefs = async () => { throw new Error('no registry'); }; smart.hooks.now = later;
+  const r = await identify(f.orphan, f.used, installer);
+  for (const p of [f.orphan, f.used, installer]) assert.strictEqual(r[p].verdict, 'keep', path.basename(p));
+});
+
+test('Disk analyzer: old app versions are Safe, the newest, the updater and the packages are Keep', async () => {
+  const f = squirrelFixture();
+  const r = await identify(path.join(f.chatty, 'app-1.0.9'), path.join(f.chatty, 'app-1.0.9', 'Chatty.exe'), path.join(f.chatty, 'app-1.0.10'), path.join(f.chatty, 'Update.exe'), path.join(f.chatty, 'packages'), f.chatty);
+  assert.strictEqual(r[path.join(f.chatty, 'app-1.0.9')].verdict, 'safe');
+  assert.strictEqual(r[path.join(f.chatty, 'app-1.0.9', 'Chatty.exe')].verdict, 'safe');
+  assert.match(r[path.join(f.chatty, 'app-1.0.9')].what, /1\.0\.9.*1\.0\.10/);
+  assert.strictEqual(r[path.join(f.chatty, 'app-1.0.10')].verdict, 'keep');
+  assert.strictEqual(r[path.join(f.chatty, 'Update.exe')].verdict, 'keep');
+  assert.strictEqual(r[path.join(f.chatty, 'packages')].verdict, 'keep');
+  assert.strictEqual(r[f.chatty].verdict, 'review');
+  assert.match(r[f.chatty].what, /Older versions are still here \(2\)/);
+});
+
+test('Disk analyzer: the explanations exist in Russian', async () => {
+  const f = installerFixture();
+  const g = squirrelFixture();
+  fakeRegistry(f.refs);
+  i18n.setLanguage('ru');
+  const cyr = /[Ѐ-ӿ]/;
+  const r = await identify(installer, f.used, f.patch, f.orphan, path.dirname(f.icon), path.join(g.chatty, 'app-1.0.9'), path.join(g.chatty, 'app-1.0.10'), path.join(g.chatty, 'Update.exe'), g.chatty);
+  for (const [p, info] of Object.entries(r)) for (const k of ['kind', 'what', 'advice']) {
+    assert.match(info[k], cyr, `${path.basename(p)} ${k} is not translated: ${info[k]}`);
+    assert.ok(!/\{\w+\}/.test(info[k]), `${path.basename(p)} ${k} has an unfilled placeholder`);
+  }
+});
+
+test('Disk analyzer: Installer files that something needs cannot be moved to the Recycle Bin, even if asked directly', async () => {
+  const f = installerFixture();
+  fakeRegistry(f.refs);
+  const moved = [];
+  const disk = new Disk({store: {log() {}}, trash: async p => { moved.push(p); }});
+  const res = await disk.trashPaths({paths: [f.used, f.patch, f.orphan, f.icon, installer, f.other]});
+  assert.deepStrictEqual(moved, [f.orphan], 'only the unused package may go');
+  assert.deepStrictEqual(res.done, [f.orphan]);
+  assert.strictEqual(res.failed.length, 5);
+  assert.match(res.failed[0].error, /needs them|no installed program/i);
+  // If the check fails, nothing from that folder moves.
+  moved.length = 0;
+  smart.hooks.readRefs = async () => { throw new Error('no registry'); };
+  const again = await disk.trashPaths({paths: [f.orphan, f.orphanPatch]});
+  assert.deepStrictEqual(moved, []);
+  assert.strictEqual(again.failed.length, 2);
+});
+
+test('Disk analyzer: files outside the Installer folder are not affected by the guard', async () => {
+  const f = installerFixture();
+  fakeRegistry(f.refs);
+  const elsewhere = put(path.join(root, 'Downloads', 'setup.msi'), 500);
+  const moved = [];
+  const disk = new Disk({store: {log() {}}, trash: async p => { moved.push(p); }});
+  await disk.trashPaths({paths: [elsewhere]});
+  assert.deepStrictEqual(moved, [elsewhere]);
 });
 
 test.after(() => fs.rmSync(root, {recursive: true, force: true}));
