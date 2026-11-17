@@ -1,4 +1,4 @@
-import {html, ic, api, app, bytes, num, date, checkbox, empty, modal, toast, bar, pct, onEvent, verdictBadge, explain, VERDICTS, previousScan, t, th} from '../lib.js';
+import {html, ic, api, app, bytes, num, date, checkbox, empty, modal, toast, busyModal, bar, pct, onEvent, verdictBadge, explain, VERDICTS, previousScan, t, th} from '../lib.js';
 import {onLanguageChange} from '../i18n.js';
 import {definePage} from '../page.js';
 import {chip, search as searchBox, filterHandlers, SIZE_BUCKETS, AGE_BUCKETS, daysSince, bucketTest, sep, baseName, dirName} from '../filters.js';
@@ -129,9 +129,19 @@ function filterBar() {
   ${filtersActive() ? html`<div class="filter-result"><span>${th('disk.showing', {shown: visibleItems().length, total: items.length, count: items.length})}</span><button class="linkish" data-action="clearFilters">${t('filters.clear')}</button></div>` : ''}`;
 }
 
+// What a row can do with its item: move it to the Recycle Bin, or — for the Windows Search index, which Windows keeps
+// open — rebuild it through Windows instead.
+const isIndex = p => ids.get(p)?.action === 'rebuildSearch';
+function rowAction(p) {
+  return isIndex(p)
+    ? html`<button class="icon-btn sm" data-action="rebuildIndex" title="${t('disk.rebuildSearch')}">${ic('refresh', 14)}</button>`
+    : html`<button class="icon-btn sm" data-action="trashOne" data-path="${p}" title="${tb('disk.moveTo')}">${ic('trash', 14)}</button>`;
+}
+
 // Items Aster has identified as safe to delete in this folder, one click to select them (they still need confirming).
+const selectable = i => ids.get(i.path)?.verdict === 'safe' && !isIndex(i.path);
 function safeBar() {
-  const safe = visibleItems().filter(i => ids.get(i.path)?.verdict === 'safe');
+  const safe = visibleItems().filter(selectable);
   const left = safe.filter(i => !s.selected.has(i.path));
   if (!left.length) return '';
   return html`<div class="callout green" style="margin:12px 16px 0">${ic('shield', 18)}<div class="grow"><strong>${t('disk.selectSafe', {count: left.length, size: bytes(left.reduce((n, i) => n + i.size, 0))})}</strong><div style="margin-top:2px">${t('disk.selectSafeNote')}</div></div><button class="btn btn-sm btn-secondary" data-action="selectSafe">${t('disk.selectSafeButton')}</button></div>`;
@@ -147,7 +157,7 @@ function filesTable() {
       <td>${ids.get(i.path) ? html`<button class="linkish" data-action="info" data-path="${i.path}" data-dir="${i.dir ? 1 : ''}" title="${t('disk.whatIsThis')}">${verdictBadge(ids.get(i.path).verdict)}</button>` : ''}</td>
       <td class="size-col"><div class="row"><div class="bar"><div class="bar-fill ${i.dir ? '' : 'tone-blue'}" style="width:${pct(i.size, v.size)}%"></div></div><span class="num" style="min-width:70px;text-align:right">${bytes(i.size)}</span></div></td>
       <td class="right num faint">${i.dir ? num(i.files) : date(i.mtime)}</td>
-      <td class="actions-cell"><div class="row-actions row" style="gap:2px"><button class="icon-btn sm" data-action="revealFile" data-path="${i.path}" title="${reveal()}">${ic('external', 14)}</button><button class="icon-btn sm" data-action="trashOne" data-path="${i.path}" title="${tb('disk.moveTo')}">${ic('trash', 14)}</button></div></td>
+      <td class="actions-cell"><div class="row-actions row" style="gap:2px"><button class="icon-btn sm" data-action="revealFile" data-path="${i.path}" title="${reveal()}">${ic('external', 14)}</button>${rowAction(i.path)}</div></td>
     </tr>`)}</tbody></table>
     ${v.items.length > 300 ? html`<div class="faint" style="padding:10px 14px;font-size:12px">${t('disk.showingLargest', {shown: 300, count: v.items.length})}</div>` : ''}`;
 }
@@ -165,9 +175,11 @@ function sidePanels() {
     </div>
     <div class="card" style="margin-top:16px">
       <div class="card-head"><h3 class="grow">${t('disk.largest')}</h3><span class="sub">${t(filtersActive() ? 'disk.matchingFilters' : 'disk.onThisDrive')}</span></div>
-      <div class="list">${r.top.filter(f => matchItem({...f, dir: false}, 'kind')).slice(0, filtersActive() ? 25 : 12).map(f => html`<div class="list-row clickable" style="padding:10px 16px;min-height:0;align-items:flex-start" data-action="info" data-path="${f.path}" title="${f.path}">
-        ${ic('file', 16, 'faint')}<div class="grow truncate"><div class="truncate" style="font-weight:500">${baseName(f.path)}</div><div class="meta truncate">${describe(f.path)}</div><div class="meta truncate mono" style="font-size:11px">${dirName(f.path)}</div></div>
-        <div class="stack" style="align-items:flex-end;gap:4px"><span class="num" style="font-weight:600;font-size:12.5px">${bytes(f.size)}</span>${ids.get(f.path) ? verdictBadge(ids.get(f.path).verdict) : ''}</div>
+      <div class="list">${r.top.filter(f => matchItem({...f, dir: false}, 'kind')).slice(0, filtersActive() ? 25 : 12).map(f => html`<div class="list-row top-row ${s.selected.has(f.path) ? 'selected' : ''}" style="padding:10px 16px;min-height:0;align-items:flex-start;gap:10px">
+        <span style="padding-top:2px">${checkbox(`data-change="pickRow" data-path="${f.path}" aria-label="${t('disk.selectOne')}"`, s.selected.has(f.path))}</span>
+        <div class="grow truncate clickable" data-action="info" data-path="${f.path}" title="${f.path}"><div class="truncate" style="font-weight:500">${baseName(f.path)}</div><div class="meta truncate">${describe(f.path)}</div><div class="meta truncate mono" style="font-size:11px">${dirName(f.path)}</div></div>
+        <div class="stack" style="align-items:flex-end;gap:4px"><span class="num" style="font-weight:600;font-size:12.5px">${bytes(f.size)}</span>${ids.get(f.path) ? verdictBadge(ids.get(f.path).verdict) : ''}
+          <div class="row" style="gap:2px"><button class="icon-btn sm" data-action="revealFile" data-path="${f.path}" title="${reveal()}">${ic('external', 14)}</button>${rowAction(f.path)}</div></div>
       </div>`)}</div>
     </div>`;
 }
@@ -233,13 +245,14 @@ export default definePage({
       const p = el.dataset.path;
       const info = ids.get(p) || {verdict: 'review', what: t('disk.stillIdentifying'), advice: ''};
       const item = s.view?.items.find(i => i.path === p) || s.result?.top.find(f => f.path === p);
-      const {ok} = await modal({title: baseName(p) || p, icon: VERDICTS[info.verdict]?.icon, wide: true, confirm: reveal(), cancel: t('common.close'), body: html`
+      const {ok} = await modal({title: baseName(p) || p, icon: VERDICTS[info.verdict]?.icon, wide: true, confirm: info.action === 'rebuildSearch' ? t('disk.rebuildSearch') : reveal(), cancel: t('common.close'), body: html`
         <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">${info.kind ? html`<span class="badge">${info.kind}</span>` : ''}${info.owner ? html`<span class="badge accent">${t('disk.belongsTo', {owner: info.owner})}</span>` : ''}${info.smart ? html`<span class="badge green">${ic('shield', 12)} ${t('disk.checked')}</span>` : ''}${item ? html`<span class="badge num">${bytes(item.size)}</span>` : ''}</div>
         <div class="mono selectable faint" style="font-size:11.5px;word-break:break-all;margin-bottom:12px">${p}</div>
         ${explain({contains: info.what, advice: info.advice, verdict: info.verdict})}`});
-      if (ok) api('shell.reveal', {path: p});
+      if (ok) { if (info.action === 'rebuildSearch') await rebuildSearch(this); else api('shell.reveal', {path: p}); }
     },
-    selectSafe() { for (const i of visibleItems()) if (ids.get(i.path)?.verdict === 'safe') s.selected.add(i.path); this.update(); },
+    selectSafe() { for (const i of visibleItems()) if (selectable(i)) s.selected.add(i.path); this.update(); },
+    rebuildIndex() { return rebuildSearch(this); },
     pickRow(el) { el.checked ? s.selected.add(el.dataset.path) : s.selected.delete(el.dataset.path); this.update(); },
     clearSel() { s.selected.clear(); this.update(); },
     async trashOne(el) { await trash(this, [el.dataset.path]); },
@@ -271,26 +284,46 @@ let idGen = 0;
 onLanguageChange(() => { ids.clear(); idGen++; });
 async function identifyVisible(pg) {
   if (identifying || !s.result) return;
-  const want = [...(s.view?.items.slice(0, 300) || []), ...s.result.top.slice(0, 12).map(f => ({path: f.path, dir: false}))].filter(i => !ids.has(i.path));
+  const want = [...(s.view?.items.slice(0, 300) || []), ...s.result.top.slice(0, 25).map(f => ({path: f.path, dir: false, size: f.size}))].filter(i => !ids.has(i.path));
   if (!want.length) return;
   identifying = true;
   const gen = idGen;
   try {
-    const res = await api('disk.identify', {items: want.map(i => ({path: i.path, dir: !!i.dir}))});
+    const res = await api('disk.identify', {items: want.map(i => ({path: i.path, dir: !!i.dir, size: i.size}))});
     if (gen === idGen) for (const [p, info] of Object.entries(res)) ids.set(p, info);
   } catch {} finally { identifying = false; }
   if (pg.mounted) pg.update();
 }
 
 async function trash(pg, paths) {
+  // The search index can't be moved: Windows keeps it open. It is rebuilt instead.
+  if (paths.some(isIndex)) { toast(t('disk.useRebuild'), {type: 'info', timeout: 7000}); paths = paths.filter(p => !isIndex(p)); if (!paths.length) return; }
   const items = [...s.view.items, ...s.result.top.map(f => ({...f, name: baseName(f.path), dir: false}))].filter((i, k, a) => paths.includes(i.path) && a.findIndex(x => x.path === i.path) === k);
   const size = items.reduce((n, i) => n + i.size, 0);
   const risky = items.filter(i => ids.get(i.path)?.verdict === 'keep');
+  const huge = items.some(i => i.size > 4 * 1024 ** 3);
   const {ok} = await modal({title: tb('disk.trashTitle', {count: paths.length}), icon: 'trash', danger: true, confirm: risky.length ? t('disk.moveAnyway') : tb('disk.moveTo'), wide: risky.length > 0, body: html`<p>${tb(paths.length === 1 ? 'disk.trashBodyOne' : 'disk.trashBody', {size: bytes(size)})}</p>
+    ${huge ? html`<p class="muted" style="margin-top:8px">${tb('disk.bigNote')}</p>` : ''}
     ${risky.length ? html`<div class="callout amber" style="margin-top:12px;display:block"><strong>${t(risky.length === 1 ? 'disk.recommendKeepOne' : 'disk.recommendKeep')}</strong>${risky.map(i => html`<div style="margin-top:8px"><strong>${i.name}</strong> — ${ids.get(i.path).what} ${ids.get(i.path).advice}</div>`)}</div>` : ''}
     <div class="modal-list">${items.slice(0, 50).map(i => html`<div class="list-row">${ic(i.dir ? 'folder' : 'file', 14, 'faint')}<span class="truncate mono grow" style="font-size:11.5px">${i.path}</span>${ids.get(i.path) ? verdictBadge(ids.get(i.path).verdict) : ''}</div>`)}</div>`});
   if (!ok) return;
   const r = await api('disk.trash', {paths});
   toast(`${tb('disk.moved', {count: r.done.length})}${r.failed.length ? ` · ${t('disk.failed', {count: r.failed.length})}` : ''}`, {type: r.failed.length ? 'info' : 'success'});
+  if (r.failed.length && r.failed[0].error) toast(r.failed[0].error, {type: 'error', timeout: 8000});
+  // Moved files leave the Largest files list and the totals right away.
+  const gone = new Set(r.done.map(p => p.toLowerCase()));
+  const goneSize = s.result.top.filter(f => gone.has(f.path.toLowerCase())).reduce((n, f) => n + f.size, 0);
+  s.result.top = s.result.top.filter(f => !gone.has(f.path.toLowerCase()));
+  if (r.bytes) s.result.size = Math.max(0, (s.result.size || 0) - r.bytes); else if (goneSize) s.result.size = Math.max(0, (s.result.size || 0) - goneSize);
+  s.selected.clear();
   await open(pg, s.path);
+}
+
+// The Windows Search index is open all the time, so it is reset through Windows (with its permission prompt), not deleted.
+async function rebuildSearch(pg) {
+  const {ok} = await modal({title: t('disk.rebuild.title'), icon: 'refresh', confirm: t('disk.rebuildSearch'), body: html`<p>${t('disk.rebuild.body')}</p>`});
+  if (!ok) return;
+  const busy = busyModal(t('disk.rebuild.busy'), t('disk.rebuild.busyText'));
+  try { await api('search.fix', {id: 'rebuild'}); toast(t('disk.rebuild.done'), {type: 'success', timeout: 9000}); }
+  finally { busy.close(); }
 }

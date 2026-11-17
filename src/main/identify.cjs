@@ -59,14 +59,17 @@ function translate(info) {
   return {...info, kind: td(info.kind), what: td(info.what), advice: td(info.advice), owner: OWNERS.has(info.owner) ? td(info.owner) : info.owner};
 }
 
-function classify(p, isDir, programs) { return translate(explain(p, isDir, programs)); }
+function classify(p, isDir, programs, size = null) { return translate(explain(p, isDir, programs, size)); }
 
-function explain(p, isDir, programs) {
+function explain(p, isDir, programs, size = null) {
   const l = p.toLowerCase().replace(/\\+$/, '');
   const name = path.basename(l);
   const owner = matchProgram(l, programs);
 
   if (!isDir && SYSTEM_FILES[name]) return {...SYSTEM_FILES[name]};
+
+  // The Windows Search index lives under ProgramData\Microsoft\Search — a folder name that must not be mistaken for Microsoft Office.
+  if (l.startsWith(PD + '\\microsoft\\search\\data')) return searchIndex(isDir, size);
 
   // Well-known places.
   if (l === WIN) return R('keep', 'Windows', 'The Windows operating system itself.', 'Never delete anything here manually. Use the Cleaner and Disk Cleanup for safe Windows cleanups.', 'Windows');
@@ -116,9 +119,22 @@ function explain(p, isDir, programs) {
   return R('review', 'Unknown file', td('Aster can’t tell which program created this file — its name and type ({ext}) are not a known format. It is stored in the folder "{folder}".', {ext: path.extname(p) || td('no extension'), folder: parent}), 'The folder name is the best clue. If you created that folder or recognise the app, decide based on that; otherwise it’s safer to leave the file alone.', parent ? titleCase(parent) : null);
 }
 
+// The index Windows Search builds (Windows.db, or Windows.edb on older builds, and its helper files). It holds no documents and
+// Windows can build it again, but it is open all the time, so it is reset (rebuilt), not deleted by hand.
+const BIG_INDEX = 3 * 1024 ** 3;
+function searchIndex(isDir, size) {
+  const big = size != null && size > BIG_INDEX;
+  const what = big
+    ? td('The catalogue Windows Search keeps of your files — names, properties and the words inside documents — so searching in Start and File Explorer is instant. It contains none of your documents and Windows can build it again. It is not part of Microsoft Office or any other program. A normal index is a few hundred megabytes to about 2 GB; this one is {size}, usually because many folders full of small files (projects, downloads, mail) are indexed.', {size: sizeText(size)})
+    : 'The catalogue Windows Search keeps of your files — names, properties and the words inside documents — so searching in Start and File Explorer is instant. It contains none of your documents and Windows can build it again. It is not part of Microsoft Office or any other program.';
+  return {...R('safe', isDir ? 'Windows Search index folder' : 'Windows Search index', what, 'Safe to reset — but not by deleting the file: Windows keeps it open, and a half-deleted index can break search. Use “Rebuild the search index”: Aster asks Windows for permission, Windows deletes the index and builds a new one in the background. Search may miss results for a while, and your indexing locations may return to the defaults. Afterwards, exclude huge project folders in Settings → Privacy & security → Searching Windows to keep it small.', 'Windows'), action: 'rebuildSearch'};
+}
+
 function extInfo(l, isDir) { if (isDir) return null; const hit = EXT.find(([re]) => re.test(l)); return hit ? {...hit[1]} : null; }
 function withOwner(info, owner) { return {...info, owner: info.owner || owner}; }
 function titleCase(s) { s = String(s || ''); return s === s.toLowerCase() ? s.replace(/\b\w/g, c => c.toUpperCase()) : s; }
+
+const VENDOR_DIRS = new Set(['microsoft', 'windows', 'google', 'adobe', 'intel', 'nvidia', 'amd', 'apple', 'mozilla', 'oracle', 'packages', 'common files', 'microsoft shared', 'software', 'programs']);
 
 function matchProgram(l, programs) {
   let best = null;
@@ -133,7 +149,8 @@ function matchProgram(l, programs) {
     const parts = l.slice(root.length + 1).split('\\');
     const cands = [parts[0], parts[1]].filter(Boolean);
     for (const c of cands) {
-      const hit = programs.find(p => { const n = p.name.toLowerCase(); const pub = (p.publisher || '').toLowerCase(); return c.length > 2 && (n === c || n.startsWith(c + ' ') || n.replace(/\s+/g, '') === c.replace(/\s+/g, '') || (pub && pub.split(/[ ,.]/)[0] === c && parts[1] && n.includes(parts[1]))); });
+      // A bare vendor folder (Microsoft, Google…) says nothing about which of that vendor's programs owns the data.
+      const hit = programs.find(p => { const n = p.name.toLowerCase(); const pub = (p.publisher || '').toLowerCase(); return c.length > 2 && (n === c || (!VENDOR_DIRS.has(c) && n.startsWith(c + ' ')) || n.replace(/\s+/g, '') === c.replace(/\s+/g, '') || (pub && pub.split(/[ ,.]/)[0] === c && parts[1] && n.includes(parts[1]))); });
       if (hit) return hit.name;
     }
   }
@@ -243,7 +260,7 @@ async function identify({items, programs}) {
   for (const it of items) {
     const special = await smartExplain(it);
     if (special) { out[it.path] = {...translate(special), smart: true}; continue; }
-    const info = classify(it.path, !!it.dir, programs);
+    const info = classify(it.path, !!it.dir, programs, Number.isFinite(it.size) ? it.size : null);
     const m = meta.get(it.path.toLowerCase());
     if (m && (m.product || m.company)) {
       info.owner = info.owner || [m.product, m.company].filter(Boolean)[0];

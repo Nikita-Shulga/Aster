@@ -2,6 +2,15 @@
 // tests check that every version there is here too. os: 'win' / 'mac' marks a change for one platform only.
 export const RELEASES = [
   {
+    version: '2.10.0', date: '2026-11-17',
+    title: {en: 'Delete from Largest files, sizes in Programs', ru: 'Удаление из «Крупнейших файлов», размеры в «Программах»'},
+    items: [
+      {en: 'Disk analyzer: files in “Largest files” can now be ticked and moved to the Recycle Bin, like in the folder table.', ru: 'Анализатор диска: файлы в «Крупнейших файлах» теперь можно отмечать и перемещать в Корзину, как и в таблице папки.'},
+      {os: 'win', en: 'The huge Windows.db is the Windows Search index, not Office data: marked safe, with a “Rebuild the search index” button.', ru: 'Огромный файл Windows.db — это индекс Поиска Windows, а не данные Office: он помечен как безопасный, и есть кнопка «Перестроить индекс поиска».'},
+      {os: 'win', en: 'Programs: missing sizes are measured automatically in the background, including Store apps and games, and remembered.', ru: 'Программы: недостающие размеры измеряются автоматически в фоне, в том числе у приложений Store и игр, и запоминаются.'}
+    ]
+  },
+  {
     version: '2.9.0', date: '2026-11-17',
     title: {en: 'Smart cleaning in the Disk analyzer', ru: 'Умная очистка в анализаторе диска'},
     items: [

@@ -122,6 +122,7 @@ class Disk {
     const guard = await installerGuard();
     for (const p of paths) {
       try {
+        if (inSearchIndex(p)) throw new Error(t('disk.searchIndex'));
         const stay = guard && await guard(p);
         if (stay) throw new Error(stay);
         const st = await fsp.lstat(p);
@@ -161,6 +162,9 @@ class Disk {
 
 // Windows only: what is in the Installer folder may be moved only if nothing needs it (see smart.cjs).
 const INSTALLER_DIR = path.join(process.env.SystemRoot || 'C:\\Windows', 'Installer');
+// The Windows Search index is open all the time: it is rebuilt through Windows, never moved by hand.
+const SEARCH_DIR = path.join(process.env.ProgramData || 'C:\\ProgramData', 'Microsoft', 'Search', 'Data').toLowerCase();
+const inSearchIndex = p => process.platform === 'win32' && (path.resolve(p).toLowerCase() + path.sep).startsWith(SEARCH_DIR + path.sep);
 async function installerGuard() {
   if (process.platform !== 'win32') return null;
   const smart = require('./smart.cjs');

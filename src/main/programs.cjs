@@ -110,6 +110,8 @@ function normalize(s) {
 }
 function publisherName(p) { return normalize(p).replace(/\b(inc|llc|ltd|gmbh|corp|corporation|co|limited|s\.?a\.?|ag|b\.?v\.?)\.?$/g, '').trim(); }
 
+const SIZE_FRESH_MS = 3 * 864e5;
+
 class Programs {
   constructor({store, getIcon, trash}) { this.store = store; this.getIcon = getIcon; this.trash = trash; this.items = new Map(); this.leftovers = new Map(); }
 
@@ -123,15 +125,18 @@ class Programs {
       if (seen.has(dedupe)) continue;
       seen.add(dedupe);
       const id = crypto.createHash('sha1').update(p.key).digest('hex').slice(0, 16);
-      const item = {id, type: 'desktop', ...p, size: Number.isFinite(p.size) ? p.size * 1024 : null, installDate: parseDate(p.installDate), canUninstall: !!(p.uninstall || p.quiet) && !p.noRemove, broken: false};
+      const item = {id, type: 'desktop', ...p, size: p.size > 0 ? p.size * 1024 : null, installDate: parseDate(p.installDate), canUninstall: !!(p.uninstall || p.quiet) && !p.noRemove, broken: false};
       const cmd = splitCommand(p.uninstall);
       if (cmd && !/msiexec/i.test(cmd.file) && path.isAbsolute(cmd.file) && !fs.existsSync(cmd.file)) item.broken = true;
       item.drive = driveOf(p.location) || (cmd && !/msiexec/i.test(cmd.file) ? driveOf(cmd.file) : null) || driveOf(String(p.icon || '').replace(/^"/, '')) || driveOf(p.source);
+      this.applySize(item);
+      item.drive = item.drive || driveOf(item.sizeRoot);
       this.items.set(id, item); out.push(item);
     }
     for (const p of arr(store)) {
       const id = crypto.createHash('sha1').update(p.key).digest('hex').slice(0, 16);
       const item = {id, type: 'store', ...p, installDate: parseDate(p.installDate), size: null, canUninstall: true, drive: driveOf(p.location)};
+      this.applySize(item);
       this.items.set(id, item); out.push(item);
     }
     out.sort((a, b) => a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}));
@@ -149,10 +154,40 @@ class Programs {
     return result;
   }
 
+  // A size comes from the program's own uninstall entry when it has one. Otherwise the page measures the install
+  // folder (where the program lives, see resolveSizeRoot) and the result is remembered between sessions, so the
+  // table is filled at once next time; after a few days it is measured again.
+  applySize(item) {
+    item.sizeRoot = resolveSizeRoot(item);
+    item.measurable = !!item.sizeRoot;
+    if (item.size > 0) return;
+    item.size = null;
+    const hit = this.savedSizes().get(item.id);
+    if (hit && hit.root === item.sizeRoot) { item.size = hit.size; item.sizePartial = !!hit.partial; item.sizeStale = Date.now() - hit.at > SIZE_FRESH_MS; }
+  }
+
+  savedSizes() {
+    if (this.sizes) return this.sizes;
+    this.sizes = new Map();
+    try { for (const [id, v] of Object.entries(JSON.parse(fs.readFileSync(this.sizesFile(), 'utf8')))) this.sizes.set(id, v); } catch {}
+    return this.sizes;
+  }
+  sizesFile() { return this.store?.root ? path.join(this.store.root, 'program-sizes.json') : null; }
+  saveSizes() {
+    const file = this.sizesFile();
+    if (!file) return;
+    clearTimeout(this.sizesTimer);
+    this.sizesTimer = setTimeout(() => { try { fs.writeFileSync(file, JSON.stringify(Object.fromEntries(this.sizes))); } catch {} }, 1500);
+  }
+
   async folderSize({id}) {
     const item = this.items.get(id);
-    if (!item?.location || !fs.existsSync(item.location)) return {size: null};
-    return {size: await dirSize(item.location, 15000)};
+    const root = item && (item.sizeRoot || resolveSizeRoot(item));
+    if (!root) return {size: null};
+    const r = await measureDir(root, 120000);
+    this.savedSizes().set(id, {size: r.size, partial: r.partial, at: Date.now(), root});
+    this.saveSizes();
+    return {size: r.size, partial: r.partial};
   }
 
   async uninstall({id, quiet = false}) {
@@ -285,7 +320,7 @@ function driveOf(p) {
 }
 
 function publicItem(i) {
-  const {uninstall, quiet, ...rest} = i;
+  const {uninstall, quiet, sizeRoot, ...rest} = i;
   return {...rest, hasQuiet: !!quiet};
 }
 function parseDate(s) {
@@ -305,22 +340,62 @@ function iconFile(item) {
 }
 async function readDirs(p) { try { return (await fsp.readdir(p, {withFileTypes: true})).filter(d => d.isDirectory() && !d.isSymbolicLink()).map(d => d.name); } catch { return []; } }
 async function readFiles(p) { try { return (await fsp.readdir(p, {withFileTypes: true})).filter(d => d.isFile()).map(d => d.name); } catch { return []; } }
-async function dirSize(root, budgetMs) {
+// Walks a folder within a time limit. partial: the limit was hit, so the size is only a lower bound.
+async function measureDir(root, budgetMs) {
   const deadline = Date.now() + budgetMs;
-  let total = 0;
+  let total = 0, partial = false;
   const stack = [root];
-  while (stack.length && Date.now() < deadline) {
+  while (stack.length) {
+    if (Date.now() > deadline) { partial = true; break; }
     const d = stack.pop();
     let entries;
     try { entries = await fsp.readdir(d, {withFileTypes: true}); } catch { continue; }
+    const files = [];
     for (const e of entries) {
-      const full = path.join(d, e.name);
       if (e.isSymbolicLink()) continue;
-      if (e.isDirectory()) stack.push(full);
-      else if (e.isFile()) { try { total += (await fsp.lstat(full)).size; } catch {} }
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) stack.push(full); else if (e.isFile()) files.push(full);
+    }
+    for (let i = 0; i < files.length; i += 64) {
+      for (const n of await Promise.all(files.slice(i, i + 64).map(f => fsp.lstat(f).then(s => s.size, () => 0)))) total += n;
     }
   }
-  return total;
+  return {size: total, partial};
+}
+async function dirSize(root, budgetMs) { return (await measureDir(root, budgetMs)).size; }
+
+// ---------------------------------------------------------------------------------------------------------
+// Where a program lives, for measuring it. Many installers leave InstallLocation empty, so the folders of the
+// uninstaller and of the icon are tried too. Shared or system folders are never measured as a program.
+// ---------------------------------------------------------------------------------------------------------
+const envDir = k => String(process.env[k] || '').toLowerCase().replace(/[\\/]+$/, '');
+const lowerPath = p => path.resolve(p).toLowerCase().replace(/[\\/]+$/, '');
+function tooBroad(dir) {
+  const l = lowerPath(dir);
+  const parts = l.split(/[\\/]+/).filter(Boolean);
+  if (parts.length < 2) return true; // a drive root or a top-level folder
+  const win = envDir('SystemRoot') || 'c:\\windows';
+  const pd = envDir('ProgramData') || 'c:\\programdata';
+  if (l === win || l.startsWith(win + '\\')) return true; // Windows itself
+  if (l === pd + '\\package cache' || l.startsWith(pd + '\\package cache\\')) return true; // installer copies, not the program
+  const home = envDir('USERPROFILE');
+  const containers = [envDir('ProgramFiles'), envDir('ProgramFiles(x86)'), envDir('ProgramW6432'), pd, home, envDir('APPDATA'), envDir('LOCALAPPDATA'), envDir('LOCALAPPDATA') && path.dirname(envDir('LOCALAPPDATA')), path.dirname(home || ''), home && home + '\\documents', home && home + '\\downloads', home && home + '\\desktop', 'c:\\program files\\windowsapps', 'c:\\program files\\common files', 'c:\\program files (x86)\\common files'].filter(Boolean);
+  return containers.includes(l);
+}
+function folderFromCommand(cmd) {
+  const c = splitCommand(cmd);
+  if (!c || !path.isAbsolute(c.file) || /^(msiexec|rundll32|cmd|powershell|regsvr32|wscript|cscript)(\.exe)?$/i.test(path.basename(c.file))) return null;
+  return path.dirname(c.file);
+}
+function resolveSizeRoot(item) {
+  const raw = String(item.icon || '').replace(/^"|"$/g, '').replace(/,\s*-?\d+$/, '').replace(/^"|"$/g, '').replace(/%([^%]+)%/g, (_, k) => process.env[k] || '');
+  const fromIcon = path.isAbsolute(raw) ? path.dirname(raw) : null;
+  for (const c of [item.location, folderFromCommand(item.uninstall), fromIcon]) {
+    const dir = String(c || '').replace(/^"|"$/g, '').replace(/%([^%]+)%/g, (_, k) => process.env[k] || '').trim();
+    if (!dir || !path.isAbsolute(dir) || tooBroad(dir)) continue;
+    try { if (fs.statSync(dir).isDirectory()) return path.resolve(dir); } catch {}
+  }
+  return null;
 }
 
-module.exports = {Programs, splitCommand, normalize, dirSize};
+module.exports = {Programs, splitCommand, normalize, dirSize, measureDir, resolveSizeRoot, tooBroad};

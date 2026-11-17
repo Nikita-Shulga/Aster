@@ -8,7 +8,12 @@ const opt = (value, key, extra) => ({value, ...extra, get label() { return t(key
 // macOS tracks when each app was last opened — great for finding apps you never use.
 const USED_BUCKETS = [opt('month', 'programs.used.month', {test: d => d != null && d <= 30}), opt('q', 'programs.used.q', {test: d => d != null && d > 90}), opt('y', 'programs.used.y', {test: d => d != null && d > 365}), opt('never', 'programs.used.never', {test: d => d == null})];
 const s = {items: null, loading: false, f: structuredClone(DEFAULT_FILTERS), sort: 'name', dir: 1, selected: new Set(), icons: new Map(), sizes: new Map()};
-const sizeOf = i => i.size ?? s.sizes.get(i.id) ?? null;
+// A size is the program's own figure, or one Aster measured by adding up its install folder (see measureMissing).
+const sizeOf = i => s.sizes.get(i.id)?.size ?? i.size ?? null;
+const partial = i => s.sizes.has(i.id) ? !!s.sizes.get(i.id).partial : !!i.sizePartial;
+// Items still to measure: no size of their own (or an old measurement), and Aster knows where they are installed.
+const needsMeasure = i => !s.sizes.has(i.id) && (i.size == null || i.sizeStale) && (i.measurable ?? (isMac && !!i.location));
+const sizeText = i => (partial(i) ? '≥ ' : '') + bytes(sizeOf(i));
 const TYPES = isMac
   ? [opt('app', 'programs.type.app'), opt('store', 'programs.type.appStore'), opt('apple', 'programs.type.apple')]
   : [opt('desktop', 'programs.type.desktop'), opt('store', 'programs.type.store'), opt('broken', 'programs.type.broken'), opt('noremove', 'programs.type.noremove')];
@@ -16,8 +21,33 @@ const typeTest = (i, v) => v === 'all' || (v === 'broken' ? i.broken : v === 'no
 
 async function load(page) {
   s.loading = true; page.update();
-  try { s.items = (await api('programs.list')).items; s.selected.clear(); }
+  try { s.items = (await api('programs.list')).items; s.selected.clear(); s.sizes.clear(); }
   finally { s.loading = false; page.update(); }
+  measureMissing(page);
+}
+
+// Fills in the missing sizes in the background, three folders at a time, and updates the table as they arrive.
+let measureRun = 0;
+async function measureMissing(page) {
+  const run = ++measureRun;
+  const queue = (s.items || []).filter(needsMeasure);
+  s.measuring = queue.length ? {done: 0, total: queue.length} : null;
+  if (!queue.length) return;
+  const queued = new Set(queue.map(i => i.id));
+  s.queued = queued;
+  let timer = null;
+  const refresh = () => { if (!timer) timer = setTimeout(() => { timer = null; if (page.mounted && run === measureRun) page.update(); }, 400); };
+  const worker = async () => {
+    while (queue.length && run === measureRun) {
+      const item = queue.shift();
+      try { const r = await api('programs.size', {id: item.id}); s.sizes.set(item.id, {size: r.size ?? null, partial: !!r.partial}); }
+      catch { s.sizes.set(item.id, {size: null}); }
+      queued.delete(item.id);
+      if (run === measureRun) { s.measuring.done++; refresh(); }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  if (run === measureRun) { s.measuring = null; s.queued = null; if (page.mounted) page.update(); }
 }
 
 // Every filter except `skip` — used so each chip's counts reflect the other active filters.
@@ -115,18 +145,18 @@ export default definePage({
     </div>`;
     if (!s.items) return html`${head}<div class="card card-pad">${[1, 2, 3, 4, 5, 6].map(() => html`<div class="skeleton" style="height:40px;margin:8px 0"></div>`)}</div>`;
     const list = filtered();
-    const total = s.items.reduce((n, i) => n + (i.size || 0), 0);
+    const total = s.items.reduce((n, i) => n + (sizeOf(i) || 0), 0);
     const counts = {all: s.items.length, desktop: s.items.filter(i => i.type === 'desktop').length, store: s.items.filter(i => i.type === 'store').length, broken: s.items.filter(i => i.broken).length};
     const sel = s.items.filter(i => s.selected.has(i.id));
     return html`${head}
       <div class="card">
         <div class="prog-stats">
           <div class="stat"><span class="k">${t('programs.installed')}</span><span class="v num">${num(counts.all)}</span></div>
-          <div class="stat"><span class="k">${t('programs.reportedSize')}</span><span class="v num">${bytes(total)}</span></div>
+          <div class="stat"><span class="k">${t('programs.reportedSize')}</span><span class="v num">${bytes(total)}</span>${s.measuring ? html`<span class="faint" style="font-size:11.5px"><span class="spinner"></span> ${t('programs.measuringN', {done: s.measuring.done, total: s.measuring.total})}</span>` : ''}</div>
           <div class="stat"><span class="k">${t(isMac ? 'programs.statAppStore' : 'programs.statStore')}</span><span class="v num">${num(counts.store)}</span></div>
           ${isMac ? html`<div class="stat"><span class="k">${t('programs.notUsed3m')}</span><span class="v num">${num(s.items.filter(i => (daysSince(i.lastUsed) ?? 0) > 90).length)}</span></div>` : html`<div class="stat"><span class="k">${t('programs.type.broken')}</span><span class="v num" style="${counts.broken ? 'color:var(--amber-text)' : ''}">${num(counts.broken)}</span></div>`}
           <div class="stat" style="margin-left:auto"><span class="k">${t('programs.byDrive')}</span><span class="row" style="gap:6px;margin-top:2px">${countOptions(s.items, i => i.drive, {sort: 'alpha', unknown: '?'}).map(o => {
-            const size = s.items.filter(i => (i.drive || '__none') === o.value).reduce((n, i) => n + (i.size || 0), 0);
+            const size = s.items.filter(i => (i.drive || '__none') === o.value).reduce((n, i) => n + (sizeOf(i) || 0), 0);
             return html`<button class="fchip ${s.f.drive === o.value ? 'on' : ''}" style="height:28px" data-action="quickDrive" data-drive="${o.value}" title="${t('programs.driveReported', {size: bytes(size)})}"><span class="fchip-v">${o.label}</span><span class="fchip-k">${o.count}</span></button>`;
           })}</span></div>
         </div>
@@ -150,7 +180,7 @@ export default definePage({
               <div class="s truncate">${[i.publisher, i.version].filter(Boolean).join(' · ') || '—'}</div></div></div></td>
             <td title="${i.location || ''}">${i.drive ? html`<span class="drive-tag">${i.drive}</span>` : html`<span class="faint">—</span>`}</td>
             <td class="muted num" style="white-space:nowrap">${date(isMac ? i.lastUsed : i.installDate)}</td>
-            <td class="right num" style="white-space:nowrap">${i.size != null ? bytes(i.size) : s.sizes.has(i.id) ? bytes(s.sizes.get(i.id)) : i.location && (i.type === 'desktop' || isMac) ? html`<button class="btn btn-ghost btn-sm" data-action="measure" data-id="${i.id}">${t('programs.measure')}</button>` : html`<span class="faint">—</span>`}</td>
+            <td class="right num" style="white-space:nowrap" ${partial(i) ? `title="${t('programs.partialSize')}"` : ''}>${sizeOf(i) != null ? sizeText(i) : s.queued?.has(i.id) ? html`<span class="spinner" title="${t('programs.measuring')}"></span>` : i.measurable || (isMac && i.location) ? html`<button class="btn btn-ghost btn-sm" data-action="measure" data-id="${i.id}">${t('programs.measure')}</button>` : html`<span class="faint" title="${t('programs.noFolder')}">—</span>`}</td>
             <td class="actions-cell"><div class="row" style="gap:4px;justify-content:flex-end">
               <span class="row-actions row" style="gap:2px">
                 <button class="icon-btn sm" data-action="leftovers" data-id="${i.id}" title="${t('programs.scanLeftovers')}">${ic('search', 15)}</button>
@@ -161,11 +191,11 @@ export default definePage({
             </div></td>
           </tr>`)}</tbody></table></div>` : empty({iconName: 'search', title: t('programs.noMatch'), text: t('programs.noMatchText')})}
       </div>
-      ${sel.length ? html`<div class="selection-bar"><strong>${t('programs.selected', {count: sel.length})}</strong><span style="opacity:.7">${bytes(sel.reduce((n, i) => n + (i.size || 0), 0))}</span><span class="spacer"></span>
+      ${sel.length ? html`<div class="selection-bar"><strong>${t('programs.selected', {count: sel.length})}</strong><span style="opacity:.7">${bytes(sel.reduce((n, i) => n + (sizeOf(i) || 0), 0))}</span><span class="spacer"></span>
         <button class="btn btn-ghost btn-sm" data-action="clearSel">${t('programs.clear')}</button><button class="btn btn-danger btn-sm" data-action="batch">${ic('trash', 15)} ${t('programs.uninstallN', {count: sel.length})}</button></div>` : ''}`;
   },
   afterRender() { if (s.items) loadIcons(this, filtered()); },
-  onMount() { if (!s.items && !s.loading) load(this); },
+  onMount() { if (!s.items && !s.loading) load(this); else if (s.items && !s.measuring) measureMissing(this); },
   on: {
     refresh() { return load(this); },
     ...filterHandlers(() => s.f, DEFAULT_FILTERS),
@@ -174,7 +204,7 @@ export default definePage({
     pick(el) { el.checked ? s.selected.add(el.dataset.id) : s.selected.delete(el.dataset.id); this.update(); },
     all(el) { filtered().forEach(i => el.checked ? s.selected.add(i.id) : s.selected.delete(i.id)); this.update(); },
     clearSel() { s.selected.clear(); this.update(); },
-    async measure(el) { el.disabled = true; el.innerHTML = '<span class="spinner"></span>'; const r = await api('programs.size', {id: el.dataset.id}); s.sizes.set(el.dataset.id, r.size || 0); this.update(); },
+    async measure(el) { el.disabled = true; el.innerHTML = '<span class="spinner"></span>'; const r = await api('programs.size', {id: el.dataset.id}); s.sizes.set(el.dataset.id, {size: r.size ?? null, partial: !!r.partial}); this.update(); },
     reveal(el) { const i = s.items.find(x => x.id === el.dataset.id); if (i?.location) api('shell.reveal', {path: i.location}); },
     async leftovers(el) { await leftovers(this, s.items.find(x => x.id === el.dataset.id)); },
     async uninstall(el) { await uninstall(this, s.items.find(x => x.id === el.dataset.id)); },
